@@ -1,0 +1,12 @@
+{
+  "name": "Claude Design Assistant",
+  "id": "claude-design-assistant",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["https://m.search.naver.com"],
+    "reasoning": "맞춤법 검사 API 호출을 위해 필요합니다."
+  }
+}
