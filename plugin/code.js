@@ -1,0 +1,1865 @@
+// Likey Assistant - Figma Plugin
+
+figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+
+// 현재 선택된 필드명 저장 (미리보기용)
+let currentFieldName = null;
+
+function updateSelectionInfo() {
+  const selection = figma.currentPage.selection;
+
+  // 현재 필드명이 설정되어 있으면 일치하는 레이어 개수도 계산
+  let matchingCount = 0;
+  if (currentFieldName) {
+    for (const node of selection) {
+      matchingCount += countMatchingLayersInNode(node, currentFieldName.toLowerCase());
+    }
+  }
+
+  figma.ui.postMessage({
+    type: 'selection-update',
+    count: selection.length,
+    names: selection.map(node => node.name).slice(0, 3),
+    matchingCount: matchingCount
+  });
+}
+
+// 일치하는 레이어 개수 세기
+function countMatchingLayers(fieldName) {
+  currentFieldName = fieldName;
+  const selection = figma.currentPage.selection;
+
+  let matchingCount = 0;
+  for (const node of selection) {
+    matchingCount += countMatchingLayersInNode(node, fieldName.toLowerCase());
+  }
+
+  figma.ui.postMessage({
+    type: 'selection-update',
+    count: selection.length,
+    names: selection.map(node => node.name).slice(0, 3),
+    matchingCount: matchingCount
+  });
+}
+
+// 노드 내에서 필드명과 일치하는 레이어 개수 재귀적으로 세기
+function countMatchingLayersInNode(node, fieldNameLower) {
+  let count = 0;
+
+  // 현재 노드의 이름이 필드명과 일치하는지 확인
+  if (node.name.toLowerCase() === fieldNameLower) {
+    count++;
+  }
+
+  // 자식 노드들도 재귀적으로 탐색
+  if ('children' in node && node.children) {
+    for (const child of node.children) {
+      count += countMatchingLayersInNode(child, fieldNameLower);
+    }
+  }
+
+  return count;
+}
+
+// 선택 변경 감지
+figma.on('selectionchange', () => {
+  updateSelectionInfo();
+});
+
+// 초기 선택 정보 전송
+updateSelectionInfo();
+
+// UI에서 메시지 수신
+figma.ui.onmessage = async (msg) => {
+  if (msg.type === 'execute-command') {
+    await executeCommand(msg.command);
+  }
+
+  if (msg.type === 'get-selection-info') {
+    getSelectionInfo();
+  }
+
+  // 직접 텍스트 변경
+  if (msg.type === 'direct-text-change') {
+    await directTextChange(msg.text);
+  }
+
+  if (msg.type === 'spell-check') {
+    await spellCheck();
+  }
+
+  if (msg.type === 'spell-check-response') {
+    // UI에서 받은 맞춤법 검사 결과 처리
+    figma.ui.postMessage({
+      type: 'spell-results',
+      errors: msg.errors
+    });
+  }
+
+  // 레이어 네이밍 기능
+  if (msg.type === 'load-layers') {
+    loadSelectedLayers();
+  }
+
+  if (msg.type === 'rename-layers') {
+    renameLayers(msg.changes);
+  }
+
+  // 선택된 레이어 이름 변경 (Selected Change)
+  if (msg.type === 'rename-selected') {
+    renameSelectedLayers(msg.namingType);
+  }
+
+  // 자동 네이밍 (Auto Rename)
+  if (msg.type === 'auto-rename') {
+    autoRenameAllLayers();
+  }
+
+  // UI 리사이즈
+  if (msg.type === 'resize') {
+    figma.ui.resize(msg.width, msg.height);
+  }
+
+  // 더미 데이터 적용
+  if (msg.type === 'apply-dummy-data') {
+    applyDummyData(msg.value);
+  }
+
+  // 랜덤 채우기
+  if (msg.type === 'random-fill') {
+    randomFillData(msg.category, msg.data);
+  }
+
+  // 이미지 채우기
+  if (msg.type === 'apply-image-fill') {
+    applyImageFill(msg.imageType);
+  }
+
+  // 일치하는 레이어 개수 세기
+  if (msg.type === 'count-matching-layers') {
+    countMatchingLayers(msg.fieldName);
+  }
+
+  // 디자인 시스템 체커
+  if (msg.type === 'scan-design-system') {
+    scanDesignSystem(msg.checkerType);
+  }
+
+  // 특정 노드 선택
+  if (msg.type === 'select-node') {
+    selectNodeById(msg.nodeId);
+  }
+
+  // 여러 노드 선택
+  if (msg.type === 'select-multiple-nodes') {
+    selectMultipleNodes(msg.nodeIds);
+  }
+
+  // 노션 내용과 비교
+  if (msg.type === 'compare-with-notion') {
+    compareWithNotion(msg.notionText);
+  }
+};
+
+// 선택된 레이어 정보 가져오기
+function getSelectionInfo() {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'selection-info',
+      info: '선택된 레이어가 없습니다.'
+    });
+    return;
+  }
+
+  const infos = selection.map(node => {
+    let info = `[${node.type}] ${node.name}\n`;
+    info += `  - ID: ${node.id}\n`;
+    info += `  - 위치: (${Math.round(node.x)}, ${Math.round(node.y)})\n`;
+    info += `  - 크기: ${Math.round(node.width)} x ${Math.round(node.height)}\n`;
+
+    if (node.type === 'TEXT') {
+      info += `  - 텍스트: "${node.characters}"\n`;
+      info += `  - 폰트 크기: ${node.fontSize}\n`;
+    }
+
+    if ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0) {
+      const fill = node.fills[0];
+      if (fill.type === 'SOLID') {
+        const color = fill.color;
+        const hex = rgbToHex(color.r, color.g, color.b);
+        info += `  - 배경색: ${hex}\n`;
+      }
+    }
+
+    if ('opacity' in node) {
+      info += `  - 투명도: ${Math.round(node.opacity * 100)}%\n`;
+    }
+
+    return info;
+  });
+
+  figma.ui.postMessage({
+    type: 'selection-info',
+    info: infos.join('\n')
+  });
+}
+
+// 명령어 실행
+async function executeCommand(command) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  try {
+    // 명령어 파싱 및 실행
+    const result = await parseAndExecute(command, selection);
+
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'success',
+      message: result
+    });
+  } catch (error) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: `오류: ${error.message}`
+    });
+  }
+}
+
+// 명령어 파싱 및 실행
+async function parseAndExecute(command, selection) {
+  const cmd = command.toLowerCase();
+
+  // 텍스트 찾아서 변경: "기존텍스트>새텍스트" 형식
+  // 예: "팔로워(전체)>전체 메시지"
+  if (command.includes('>') && !command.startsWith('>')) {
+    const parts = command.split('>');
+    if (parts.length === 2) {
+      const searchText = parts[0].trim();
+      const newText = parts[1].trim();
+
+      let changed = 0;
+
+      for (const node of selection) {
+        // 선택된 노드 내의 모든 텍스트에서 검색 (컴포넌트, 인스턴스, 오토레이아웃 포함)
+        const textNodes = findTextNodeByContent(node, searchText);
+
+        for (const textNode of textNodes) {
+          const success = await replaceTextInNode(textNode, searchText, newText);
+          if (success) changed++;
+        }
+      }
+
+      if (changed === 0) {
+        throw new Error(`"${searchText}" 텍스트를 찾을 수 없습니다.`);
+      }
+
+      return `"${searchText}"를 "${newText}"로 ${changed}개 변경했습니다.`;
+    }
+  }
+
+  // 프레임 내 모든 텍스트 변경: ">새텍스트" 형식
+  if (command.startsWith('>')) {
+    const newText = command.slice(1).trim();
+    let changed = 0;
+
+    for (const node of selection) {
+      // 프레임/그룹/컴포넌트/인스턴스 내부 텍스트 모두 찾기
+      const textNodes = findAllTextNodes(node);
+
+      for (const textNode of textNodes) {
+        const success = await changeTextInNode(textNode, newText);
+        if (success) changed++;
+      }
+    }
+
+    if (changed === 0) {
+      throw new Error('선택된 영역에 텍스트가 없습니다.');
+    }
+
+    return `${changed}개의 텍스트를 "${newText}"로 변경했습니다.`;
+  }
+
+  // 텍스트 변경 - 기존 방식도 지원
+  const textMatch = command.match(/['"'"](.+?)['"'"]/);
+  if ((cmd.includes('텍스트') && cmd.includes('변경')) || cmd.includes('text')) {
+    let newText;
+
+    if (textMatch) {
+      newText = textMatch[1];
+    } else {
+      throw new Error("변경할 텍스트를 입력해주세요.\n예: 팔로워(전체)>전체 메시지");
+    }
+
+    let changed = 0;
+
+    for (const node of selection) {
+      const textNodes = findAllTextNodes(node);
+
+      for (const textNode of textNodes) {
+        const success = await changeTextInNode(textNode, newText);
+        if (success) changed++;
+      }
+    }
+
+    if (changed === 0) {
+      throw new Error('선택된 영역에 텍스트가 없습니다.');
+    }
+
+    return `${changed}개의 텍스트를 "${newText}"로 변경했습니다.`;
+  }
+
+  // 색상 변경
+  const colorMatch = command.match(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})/);
+  if ((cmd.includes('색') && cmd.includes('변경')) || cmd.includes('color')) {
+    if (!colorMatch) {
+      throw new Error('색상을 HEX 코드로 입력해주세요. 예: #FF5733');
+    }
+
+    const hex = colorMatch[0];
+    const rgb = hexToRgb(hex);
+    let changed = 0;
+
+    for (const node of selection) {
+      if ('fills' in node) {
+        const fills = JSON.parse(JSON.stringify(node.fills));
+        if (fills.length > 0 && fills[0].type === 'SOLID') {
+          fills[0].color = rgb;
+          node.fills = fills;
+          changed++;
+        } else {
+          node.fills = [{ type: 'SOLID', color: rgb }];
+          changed++;
+        }
+      }
+    }
+
+    if (changed === 0) {
+      throw new Error('색상을 변경할 수 없는 레이어입니다.');
+    }
+
+    return `${changed}개의 레이어 색상을 ${hex}로 변경했습니다.`;
+  }
+
+  // 크기 변경 (너비)
+  const widthMatch = cmd.match(/너비[를을]?\s*(\d+)/);
+  if (widthMatch) {
+    const newWidth = parseInt(widthMatch[1]);
+
+    for (const node of selection) {
+      if ('resize' in node) {
+        node.resize(newWidth, node.height);
+      }
+    }
+
+    return `너비를 ${newWidth}px로 변경했습니다.`;
+  }
+
+  // 크기 변경 (높이)
+  const heightMatch = cmd.match(/높이[를을]?\s*(\d+)/);
+  if (heightMatch) {
+    const newHeight = parseInt(heightMatch[1]);
+
+    for (const node of selection) {
+      if ('resize' in node) {
+        node.resize(node.width, newHeight);
+      }
+    }
+
+    return `높이를 ${newHeight}px로 변경했습니다.`;
+  }
+
+  // 투명도 변경
+  const opacityMatch = cmd.match(/(\d+)\s*%/);
+  if (cmd.includes('투명도') && opacityMatch) {
+    const opacity = parseInt(opacityMatch[1]) / 100;
+
+    for (const node of selection) {
+      if ('opacity' in node) {
+        node.opacity = Math.max(0, Math.min(1, opacity));
+      }
+    }
+
+    return `투명도를 ${opacityMatch[1]}%로 변경했습니다.`;
+  }
+
+  // 레이어 복제
+  if (cmd.includes('복제') || cmd.includes('복사') || cmd.includes('duplicate')) {
+    const newNodes = [];
+
+    for (const node of selection) {
+      const clone = node.clone();
+      clone.x += 20;
+      clone.y += 20;
+      newNodes.push(clone);
+    }
+
+    figma.currentPage.selection = newNodes;
+    return `${selection.length}개의 레이어를 복제했습니다.`;
+  }
+
+  // 레이어 삭제
+  if (cmd.includes('삭제') || cmd.includes('delete') || cmd.includes('remove')) {
+    const count = selection.length;
+
+    for (const node of selection) {
+      node.remove();
+    }
+
+    return `${count}개의 레이어를 삭제했습니다.`;
+  }
+
+  // 폰트 크기 변경
+  const fontSizeMatch = cmd.match(/폰트\s*(?:크기)?[를을]?\s*(\d+)/);
+  if (fontSizeMatch || (cmd.includes('font') && cmd.includes('size'))) {
+    const sizeMatch = command.match(/(\d+)/);
+    if (!sizeMatch) {
+      throw new Error('폰트 크기를 숫자로 입력해주세요.');
+    }
+
+    const newSize = parseInt(sizeMatch[1]);
+    let changed = 0;
+
+    for (const node of selection) {
+      if (node.type === 'TEXT') {
+        await figma.loadFontAsync(node.fontName);
+        node.fontSize = newSize;
+        changed++;
+      }
+    }
+
+    if (changed === 0) {
+      throw new Error('선택된 레이어 중 텍스트가 없습니다.');
+    }
+
+    return `폰트 크기를 ${newSize}px로 변경했습니다.`;
+  }
+
+  // 이동
+  const moveMatch = cmd.match(/[이동|움직|move].*?[(\(]?\s*(-?\d+)\s*,\s*(-?\d+)\s*[)\)]?/);
+  if (moveMatch) {
+    const dx = parseInt(moveMatch[1]);
+    const dy = parseInt(moveMatch[2]);
+
+    for (const node of selection) {
+      node.x += dx;
+      node.y += dy;
+    }
+
+    return `레이어를 (${dx}, ${dy})만큼 이동했습니다.`;
+  }
+
+  // 숨기기
+  if (cmd.includes('숨기') || cmd.includes('hide')) {
+    for (const node of selection) {
+      node.visible = false;
+    }
+
+    return `${selection.length}개의 레이어를 숨겼습니다.`;
+  }
+
+  // 보이기
+  if (cmd.includes('보이') || cmd.includes('show') || cmd.includes('표시')) {
+    for (const node of selection) {
+      node.visible = true;
+    }
+
+    return `${selection.length}개의 레이어를 표시했습니다.`;
+  }
+
+  // 이름 변경
+  const nameMatch = command.match(/이름[을를]?\s*['"'"](.+?)['"'"]/);
+  if (nameMatch) {
+    const newName = nameMatch[1];
+
+    for (const node of selection) {
+      node.name = newName;
+    }
+
+    return `레이어 이름을 "${newName}"으로 변경했습니다.`;
+  }
+
+  // 모서리 둥글기
+  const radiusMatch = cmd.match(/(?:모서리|라운드|radius|corner)[를을]?\s*(\d+)/);
+  if (radiusMatch) {
+    const radius = parseInt(radiusMatch[1]);
+
+    for (const node of selection) {
+      if ('cornerRadius' in node) {
+        node.cornerRadius = radius;
+      }
+    }
+
+    return `모서리 둥글기를 ${radius}px로 변경했습니다.`;
+  }
+
+  throw new Error(`명령어를 이해하지 못했습니다: "${command}"\n예시 명령어를 참고해주세요.`);
+}
+
+// 유틸리티 함수들
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) {
+    const shortResult = /^#?([a-f\d])([a-f\d])([a-f\d])$/i.exec(hex);
+    if (shortResult) {
+      return {
+        r: parseInt(shortResult[1] + shortResult[1], 16) / 255,
+        g: parseInt(shortResult[2] + shortResult[2], 16) / 255,
+        b: parseInt(shortResult[3] + shortResult[3], 16) / 255
+      };
+    }
+    return { r: 0, g: 0, b: 0 };
+  }
+  return {
+    r: parseInt(result[1], 16) / 255,
+    g: parseInt(result[2], 16) / 255,
+    b: parseInt(result[3], 16) / 255
+  };
+}
+
+function rgbToHex(r, g, b) {
+  const toHex = (c) => {
+    const hex = Math.round(c * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+// 노드 내부의 모든 텍스트 노드 찾기 (재귀)
+// 컴포넌트, 인스턴스, 오토레이아웃 모두 지원
+function findAllTextNodes(node) {
+  const textNodes = [];
+
+  // 텍스트 노드인 경우
+  if (node.type === 'TEXT') {
+    textNodes.push(node);
+    return textNodes;
+  }
+
+  // 자식이 있는 모든 노드 타입 처리
+  // FRAME, GROUP, COMPONENT, COMPONENT_SET, INSTANCE, SECTION, PAGE 등
+  if ('children' in node && node.children) {
+    for (const child of node.children) {
+      textNodes.push(...findAllTextNodes(child));
+    }
+  }
+
+  return textNodes;
+}
+
+// 특정 텍스트를 포함하는 텍스트 노드 찾기
+function findTextNodeByContent(node, searchText) {
+  const allTextNodes = findAllTextNodes(node);
+  return allTextNodes.filter(textNode =>
+    textNode.characters.includes(searchText)
+  );
+}
+
+// 인스턴스 내 텍스트 변경을 위한 헬퍼 함수
+async function changeTextInNode(textNode, newText) {
+  try {
+    // Mixed fonts 처리
+    if (textNode.fontName === figma.mixed) {
+      // 모든 문자의 폰트를 로드
+      const len = textNode.characters.length;
+      for (let i = 0; i < len; i++) {
+        const font = textNode.getRangeFontName(i, i + 1);
+        await figma.loadFontAsync(font);
+      }
+    } else {
+      await figma.loadFontAsync(textNode.fontName);
+    }
+    textNode.characters = newText;
+    return true;
+  } catch (e) {
+    console.error('Font load error:', e);
+    return false;
+  }
+}
+
+// 텍스트 부분 교체를 위한 헬퍼 함수
+async function replaceTextInNode(textNode, searchText, newText) {
+  try {
+    // Mixed fonts 처리
+    if (textNode.fontName === figma.mixed) {
+      const len = textNode.characters.length;
+      for (let i = 0; i < len; i++) {
+        const font = textNode.getRangeFontName(i, i + 1);
+        await figma.loadFontAsync(font);
+      }
+    } else {
+      await figma.loadFontAsync(textNode.fontName);
+    }
+    textNode.characters = textNode.characters.replace(searchText, newText);
+    return true;
+  } catch (e) {
+    console.error('Font load error:', e);
+    return false;
+  }
+}
+
+// 선택된 레이어 불러오기 (네이밍용)
+function loadSelectedLayers() {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'naming-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  // 선택된 레이어와 하위 레이어 수집
+  const layers = [];
+
+  function collectLayers(node, depth = 0) {
+    // 최대 깊이 제한 (너무 깊은 중첩 방지)
+    if (depth > 10) return;
+
+    layers.push({
+      id: node.id,
+      name: node.name,
+      type: getShortType(node.type)
+    });
+
+    // 하위 레이어도 수집 (옵션)
+    if ('children' in node && node.children && depth === 0) {
+      // 첫 번째 레벨의 자식만 수집
+      for (const child of node.children) {
+        layers.push({
+          id: child.id,
+          name: child.name,
+          type: getShortType(child.type)
+        });
+      }
+    }
+  }
+
+  for (const node of selection) {
+    collectLayers(node);
+  }
+
+  figma.ui.postMessage({
+    type: 'layers-loaded',
+    layers: layers
+  });
+}
+
+// 레이어 타입 축약
+function getShortType(type) {
+  const typeMap = {
+    'FRAME': 'Frame',
+    'GROUP': 'Group',
+    'TEXT': 'Text',
+    'RECTANGLE': 'Rect',
+    'ELLIPSE': 'Ellipse',
+    'VECTOR': 'Vector',
+    'COMPONENT': 'Comp',
+    'INSTANCE': 'Inst',
+    'COMPONENT_SET': 'Set',
+    'LINE': 'Line',
+    'POLYGON': 'Poly',
+    'STAR': 'Star',
+    'BOOLEAN_OPERATION': 'Bool',
+    'SLICE': 'Slice',
+    'SECTION': 'Sect'
+  };
+  return typeMap[type] || type;
+}
+
+// 레이어 이름 변경
+function renameLayers(changes) {
+  let renamed = 0;
+
+  for (const change of changes) {
+    const node = figma.getNodeById(change.id);
+    if (node) {
+      node.name = change.name;
+      renamed++;
+    }
+  }
+
+  figma.ui.postMessage({
+    type: 'naming-status',
+    status: 'success',
+    message: `${renamed}개의 레이어 이름을 변경했습니다.`
+  });
+}
+
+// 선택된 레이어 이름 변경 (Selected Change)
+function renameSelectedLayers(namingType) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'rename-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  let renamed = 0;
+
+  function renameRecursive(node) {
+    // Component, Instance는 변경하지 않음
+    if (node.type === 'COMPONENT' || node.type === 'INSTANCE' || node.type === 'COMPONENT_SET') {
+      return;
+    }
+
+    node.name = namingType;
+    renamed++;
+
+    // 자식 노드도 재귀적으로 처리
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        renameRecursive(child);
+      }
+    }
+  }
+
+  for (const node of selection) {
+    renameRecursive(node);
+  }
+
+  figma.ui.postMessage({
+    type: 'rename-status',
+    status: 'success',
+    message: `${renamed}개의 레이어 이름을 "${namingType}"으로 변경했습니다.`
+  });
+}
+
+// 자동 네이밍 (Auto Rename) - Naming Guide 규칙 적용
+function autoRenameAllLayers() {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'rename-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  let renamed = 0;
+
+  function getAutoName(node, parentIsAutoLayout = false) {
+    // Component, Instance는 변경하지 않음
+    if (node.type === 'COMPONENT' || node.type === 'INSTANCE' || node.type === 'COMPONENT_SET') {
+      return null;
+    }
+
+    // TEXT -> "Text"
+    if (node.type === 'TEXT') {
+      return 'Text';
+    }
+
+    // Image Fill 체크 -> "Image"
+    if ('fills' in node && Array.isArray(node.fills)) {
+      const hasImageFill = node.fills.some(fill => fill.type === 'IMAGE');
+      if (hasImageFill) {
+        return 'Image';
+      }
+    }
+
+    // FRAME/GROUP 처리
+    if (node.type === 'FRAME' || node.type === 'GROUP') {
+      // Auto Layout 체크
+      const isAutoLayout = 'layoutMode' in node && node.layoutMode !== 'NONE';
+
+      if (isAutoLayout) {
+        // All Auto Layouts -> "Section"
+        return 'Section';
+      } else if (parentIsAutoLayout) {
+        // FRAME/GROUP Inside Auto Layout -> "Item"
+        return 'Item';
+      } else {
+        // Frame/Group (Not Auto Layout) -> "Content"
+        return 'Content';
+      }
+    }
+
+    // 기타 도형들
+    if (node.type === 'RECTANGLE' || node.type === 'ELLIPSE' ||
+        node.type === 'POLYGON' || node.type === 'STAR' ||
+        node.type === 'LINE' || node.type === 'VECTOR') {
+      // Image Fill 체크
+      if ('fills' in node && Array.isArray(node.fills)) {
+        const hasImageFill = node.fills.some(fill => fill.type === 'IMAGE');
+        if (hasImageFill) {
+          return 'Image';
+        }
+      }
+      return 'Item';
+    }
+
+    return null;
+  }
+
+  function renameRecursive(node, parentIsAutoLayout = false) {
+    const newName = getAutoName(node, parentIsAutoLayout);
+
+    if (newName) {
+      node.name = newName;
+      renamed++;
+    }
+
+    // 현재 노드가 Auto Layout인지 확인
+    const isAutoLayout = 'layoutMode' in node && node.layoutMode !== 'NONE';
+
+    // 자식 노드 처리
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        // Component/Instance 내부는 처리하지 않음
+        if (node.type !== 'COMPONENT' && node.type !== 'INSTANCE' && node.type !== 'COMPONENT_SET') {
+          renameRecursive(child, isAutoLayout);
+        }
+      }
+    }
+  }
+
+  for (const node of selection) {
+    renameRecursive(node, false);
+  }
+
+  figma.ui.postMessage({
+    type: 'rename-status',
+    status: 'success',
+    message: `${renamed}개의 레이어를 자동으로 네이밍했습니다.`
+  });
+}
+
+// 직접 텍스트 변경 함수
+async function directTextChange(newText) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  let changed = 0;
+
+  for (const node of selection) {
+    const textNodes = findAllTextNodes(node);
+
+    for (const textNode of textNodes) {
+      const success = await changeTextInNode(textNode, newText);
+      if (success) changed++;
+    }
+  }
+
+  if (changed === 0) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: '선택된 영역에 텍스트가 없습니다.'
+    });
+    return;
+  }
+
+  figma.ui.postMessage({
+    type: 'status',
+    status: 'success',
+    message: `${changed}개의 텍스트를 변경했습니다.`
+  });
+}
+
+// 맞춤법 검사 함수
+async function spellCheck() {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  // 선택된 영역의 모든 텍스트 수집
+  const allTexts = [];
+  for (const node of selection) {
+    const textNodes = findAllTextNodes(node);
+    for (const textNode of textNodes) {
+      if (textNode.characters.trim()) {
+        allTexts.push(textNode.characters);
+      }
+    }
+  }
+
+  if (allTexts.length === 0) {
+    figma.ui.postMessage({
+      type: 'status',
+      status: 'error',
+      message: '검사할 텍스트가 없습니다.'
+    });
+    return;
+  }
+
+  // UI에 텍스트 전달하여 맞춤법 검사 요청
+  figma.ui.postMessage({
+    type: 'check-spelling',
+    texts: allTexts
+  });
+}
+
+// 더미 데이터 적용
+async function applyDummyData(value) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  let changed = 0;
+
+  for (const node of selection) {
+    const textNodes = findAllTextNodes(node);
+
+    for (const textNode of textNodes) {
+      const success = await changeTextInNode(textNode, value);
+      if (success) changed++;
+    }
+  }
+
+  if (changed === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '선택된 영역에 텍스트가 없습니다.'
+    });
+    return;
+  }
+
+  figma.ui.postMessage({
+    type: 'data-fill-status',
+    status: 'success',
+    message: `${changed}개의 텍스트에 데이터를 적용했습니다.`
+  });
+}
+
+// 순서대로 채우기 - 레이어 이름과 데이터 필드 이름이 일치하는 경우에만 적용
+async function randomFillData(category, data) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  // 데이터 필드 이름 목록 생성 (대소문자 무시 비교를 위해)
+  // 각 필드별로 현재 인덱스를 관리하여 순서대로 데이터 적용
+  const fieldMap = {};
+  for (const field of data) {
+    fieldMap[field.name.toLowerCase()] = {
+      name: field.name,
+      desc: field.desc,
+      values: field.values,
+      currentIndex: 0  // 순서대로 적용을 위한 인덱스
+    };
+  }
+
+  let changed = 0;
+  let matched = 0;
+
+  for (const node of selection) {
+    // 선택된 노드와 모든 하위 노드 탐색
+    const result = await fillMatchingLayersSequential(node, fieldMap);
+    changed += result.changed;
+    matched += result.matched;
+  }
+
+  if (matched === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '일치하는 레이어 이름이 없습니다. 레이어 이름을 데이터 필드명(예: CreatorName, FollowersText)과 동일하게 설정해주세요.'
+    });
+    return;
+  }
+
+  if (changed === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '선택된 영역에 텍스트가 없습니다.'
+    });
+    return;
+  }
+
+  figma.ui.postMessage({
+    type: 'data-fill-status',
+    status: 'success',
+    message: `${matched}개의 일치 레이어에서 ${changed}개의 텍스트에 데이터를 순서대로 적용했습니다.`
+  });
+}
+
+// 레이어 이름과 데이터 필드 이름이 일치하는 경우에만 순서대로 데이터 적용
+async function fillMatchingLayersSequential(node, fieldMap) {
+  let changed = 0;
+  let matched = 0;
+
+  // 현재 노드의 이름이 필드명과 일치하는지 확인
+  const nodeName = node.name.toLowerCase();
+  const matchingField = fieldMap[nodeName];
+
+  if (matchingField && matchingField.values && matchingField.values.length > 0) {
+    matched++;
+
+    // 순서대로 값 가져오기 (인덱스가 넘어가면 처음부터 다시)
+    const currentIdx = matchingField.currentIndex % matchingField.values.length;
+    const value = matchingField.values[currentIdx];
+    matchingField.currentIndex++;  // 다음 인덱스로 증가
+
+    // 이 노드가 텍스트이면 직접 변경
+    if (node.type === 'TEXT') {
+      const success = await changeTextInNode(node, value);
+      if (success) changed++;
+    } else {
+      // 이 노드 내부의 모든 텍스트 노드 찾아서 변경 (같은 값으로)
+      const textNodes = findAllTextNodes(node);
+      for (const textNode of textNodes) {
+        const success = await changeTextInNode(textNode, value);
+        if (success) changed++;
+      }
+    }
+  }
+
+  // 자식 노드들도 재귀적으로 탐색
+  if ('children' in node && node.children) {
+    for (const child of node.children) {
+      const result = await fillMatchingLayersSequential(child, fieldMap);
+      changed += result.changed;
+      matched += result.matched;
+    }
+  }
+
+  return { changed, matched };
+}
+
+// 이미지 채우기 기능
+async function applyImageFill(imageType) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  // 이미지 Fill을 적용할 수 있는 노드들 찾기
+  const fillableNodes = findFillableNodes(selection);
+
+  if (fillableNodes.length === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '이미지를 적용할 수 있는 레이어가 없습니다. (Frame, Rectangle, Ellipse 등)'
+    });
+    return;
+  }
+
+  let changed = 0;
+
+  for (const node of fillableNodes) {
+    try {
+      console.log(`Processing node: ${node.name} (${node.type})`);
+      const imageUrl = getImageUrl(imageType, node.width, node.height);
+      console.log(`Fetching image from: ${imageUrl}`);
+      const imageData = await fetchImageData(imageUrl);
+
+      if (imageData) {
+        console.log(`Image data received, size: ${imageData.length}`);
+        const image = figma.createImage(imageData);
+        console.log(`Image created with hash: ${image.hash}`);
+
+        // 기존 fills 복사하여 이미지만 교체
+        try {
+          // fills 읽기 가능한지 체크
+          const currentFills = node.fills;
+          console.log(`Current fills type: ${typeof currentFills}, isArray: ${Array.isArray(currentFills)}`);
+
+          if (currentFills === figma.mixed) {
+            console.log('Fills is mixed, skipping...');
+            continue;
+          }
+
+          const fillsCopy = JSON.parse(JSON.stringify(currentFills || []));
+          let newFills = [];
+
+          // 기존에 이미지 Fill이 있으면 그것만 교체
+          let hasExistingImage = false;
+          for (const fill of fillsCopy) {
+            if (fill.type === 'IMAGE') {
+              hasExistingImage = true;
+              newFills.push({
+                type: 'IMAGE',
+                imageHash: image.hash,
+                scaleMode: fill.scaleMode || 'FILL',
+                visible: fill.visible !== false,
+                opacity: fill.opacity !== undefined ? fill.opacity : 1
+              });
+            } else {
+              newFills.push(fill);
+            }
+          }
+
+          // 기존 이미지가 없으면 새로 추가
+          if (!hasExistingImage) {
+            newFills = [{
+              type: 'IMAGE',
+              imageHash: image.hash,
+              scaleMode: 'FILL'
+            }];
+          }
+
+          console.log(`Setting new fills:`, JSON.stringify(newFills));
+          node.fills = newFills;
+          console.log(`Successfully applied to: ${node.name}`);
+          changed++;
+        } catch (fillError) {
+          console.error('Cannot override fills:', fillError.message, node.name, node.type);
+
+          // 대안: 직접 fills 배열 생성 시도
+          try {
+            console.log('Trying alternative method...');
+            node.fills = [{
+              type: 'IMAGE',
+              imageHash: image.hash,
+              scaleMode: 'FILL'
+            }];
+            console.log('Alternative method succeeded!');
+            changed++;
+          } catch (altError) {
+            console.error('Alternative method also failed:', altError.message);
+          }
+        }
+      } else {
+        console.log('Failed to fetch image data');
+      }
+    } catch (e) {
+      console.error('Image fill error:', e.message);
+    }
+  }
+
+  if (changed === 0) {
+    figma.ui.postMessage({
+      type: 'data-fill-status',
+      status: 'error',
+      message: '이미지를 적용하는데 실패했습니다.'
+    });
+    return;
+  }
+
+  figma.ui.postMessage({
+    type: 'data-fill-status',
+    status: 'success',
+    message: `${changed}개의 레이어에 이미지를 적용했습니다.`
+  });
+}
+
+// 이미지 Fill을 적용할 수 있는 노드 찾기
+function findFillableNodes(selection) {
+  const fillableNodes = [];
+
+  function collectFillable(node, depth = 0) {
+    const indent = '  '.repeat(depth);
+    console.log(`${indent}[${node.type}] ${node.name}`);
+
+    // 레이어 이름에 avatar, profile, image 등이 포함된 경우 우선 체크
+    const nameLower = node.name.toLowerCase();
+    const isLikelyImageLayer = nameLower.includes('avatar') ||
+                               nameLower.includes('profile') ||
+                               nameLower.includes('image') ||
+                               nameLower.includes('photo') ||
+                               nameLower.includes('thumbnail') ||
+                               nameLower.includes('img');
+
+    // fills 속성 체크
+    if ('fills' in node) {
+      try {
+        const fills = node.fills;
+        console.log(`${indent}  fills type: ${typeof fills}, isArray: ${Array.isArray(fills)}, length: ${Array.isArray(fills) ? fills.length : 'N/A'}`);
+
+        if (fills !== figma.mixed && Array.isArray(fills)) {
+          // fills 내용 상세 로그
+          fills.forEach((fill, idx) => {
+            console.log(`${indent}    fill[${idx}]: type=${fill.type}, visible=${fill.visible}`);
+          });
+
+          const hasImageFill = fills.some(fill => fill.type === 'IMAGE');
+
+          if (hasImageFill) {
+            console.log(`${indent}  ✓ Added (has IMAGE fill)`);
+            fillableNodes.push(node);
+            return;
+          }
+
+          // 이미지 이름을 가진 레이어이고 Shape인 경우
+          if (isLikelyImageLayer && (
+              node.type === 'RECTANGLE' ||
+              node.type === 'ELLIPSE' ||
+              node.type === 'FRAME' ||
+              node.type === 'POLYGON' ||
+              node.type === 'VECTOR')) {
+            console.log(`${indent}  ✓ Added (likely image layer by name)`);
+            fillableNodes.push(node);
+            return;
+          }
+        }
+      } catch (e) {
+        console.log(`${indent}  fills error: ${e.message}`);
+      }
+    }
+
+    // Shape 노드는 무조건 추가 (이미지 적용 가능)
+    if (node.type === 'RECTANGLE' || node.type === 'ELLIPSE') {
+      console.log(`${indent}  ✓ Added (shape: ${node.type})`);
+      fillableNodes.push(node);
+      // Shape도 children이 있을 수 있으므로 return하지 않음
+    }
+
+    // 자식 노드 탐색
+    if ('children' in node && node.children && node.children.length > 0) {
+      console.log(`${indent}  -> Exploring ${node.children.length} children`);
+      for (const child of node.children) {
+        collectFillable(child, depth + 1);
+      }
+    }
+  }
+
+  console.log('=== Finding fillable nodes ===');
+  for (const node of selection) {
+    collectFillable(node, 0);
+  }
+
+  console.log('=== Found nodes ===');
+  fillableNodes.forEach(n => console.log(`  - ${n.name} (${n.type})`));
+  return fillableNodes;
+}
+
+// 프로필 이미지 URL 목록 (커스텀 이미지)
+const PROFILE_IMAGES = [
+  'https://i.pravatar.cc/300?img=1',
+  'https://i.pravatar.cc/300?img=5',
+  'https://i.pravatar.cc/300?img=9',
+  'https://i.pravatar.cc/300?img=16',
+  'https://i.pravatar.cc/300?img=20',
+  'https://i.pravatar.cc/300?img=25',
+  'https://i.pravatar.cc/300?img=32',
+  'https://i.pravatar.cc/300?img=36',
+  'https://i.pravatar.cc/300?img=41',
+  'https://i.pravatar.cc/300?img=47'
+];
+
+// 이미지 타입에 따른 URL 생성
+function getImageUrl(imageType, width, height) {
+  // 기본 크기 설정 (최소 100px)
+  const w = Math.max(100, Math.round(width));
+  const h = Math.max(100, Math.round(height));
+
+  // 랜덤 시드 생성
+  const seed = Math.floor(Math.random() * 1000);
+
+  switch (imageType) {
+    case 'profile':
+      // 커스텀 프로필 이미지 중 랜덤 선택
+      const randomIdx = Math.floor(Math.random() * PROFILE_IMAGES.length);
+      return PROFILE_IMAGES[randomIdx];
+
+    case 'cover':
+      // Picsum - 넓은 가로형 이미지
+      return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+
+    case 'post':
+      // Picsum - 포스트용 이미지
+      return `https://picsum.photos/seed/post${seed}/${w}/${h}`;
+
+    case 'product':
+      // Picsum - 상품 이미지
+      return `https://picsum.photos/seed/product${seed}/${w}/${h}`;
+
+    case 'nature':
+      // Picsum - 자연 이미지 (특정 카테고리 없어서 일반 이미지)
+      return `https://picsum.photos/seed/nature${seed}/${w}/${h}`;
+
+    case 'food':
+      // Picsum - 음식 이미지
+      return `https://picsum.photos/seed/food${seed}/${w}/${h}`;
+
+    default:
+      return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+  }
+}
+
+// 이미지 데이터 가져오기
+async function fetchImageData(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  } catch (e) {
+    console.error('Fetch image error:', e);
+    return null;
+  }
+}
+
+// ===== 디자인 시스템 체커 =====
+
+// 노드 선택하기
+function selectNodeById(nodeId) {
+  try {
+    const node = figma.getNodeById(nodeId);
+    if (node && 'type' in node) {
+      figma.currentPage.selection = [node];
+      figma.viewport.scrollAndZoomIntoView([node]);
+      figma.ui.postMessage({
+        type: 'checker-status',
+        status: 'success',
+        message: `"${node.name}" 선택됨`
+      });
+    }
+  } catch (e) {
+    figma.ui.postMessage({
+      type: 'checker-status',
+      status: 'error',
+      message: '노드를 찾을 수 없습니다.'
+    });
+  }
+}
+
+// 여러 노드 선택하기
+function selectMultipleNodes(nodeIds) {
+  try {
+    const nodes = [];
+    for (const id of nodeIds) {
+      const node = figma.getNodeById(id);
+      if (node && 'type' in node) {
+        nodes.push(node);
+      }
+    }
+
+    if (nodes.length > 0) {
+      figma.currentPage.selection = nodes;
+      figma.viewport.scrollAndZoomIntoView(nodes);
+      figma.ui.postMessage({
+        type: 'checker-status',
+        status: 'success',
+        message: `${nodes.length}개 레이어 선택됨`
+      });
+    }
+  } catch (e) {
+    figma.ui.postMessage({
+      type: 'checker-status',
+      status: 'error',
+      message: '노드를 찾을 수 없습니다.'
+    });
+  }
+}
+
+// 디자인 시스템 스캔
+function scanDesignSystem(checkerType) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'checker-status',
+      status: 'error',
+      message: '먼저 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  let results = [];
+
+  switch (checkerType) {
+    case 'component':
+      results = checkComponents(selection);
+      break;
+    case 'variable':
+      results = checkVariables(selection);
+      break;
+    case 'textstyle':
+      results = checkTextStyles(selection);
+      break;
+  }
+
+  figma.ui.postMessage({
+    type: 'checker-results',
+    checkerType: checkerType,
+    results: results
+  });
+}
+
+// 컴포넌트 체크 - 디자인 시스템 컴포넌트가 아닌 레이어 찾기
+function checkComponents(selection) {
+  const results = [];
+
+  function checkNode(node) {
+    // COMPONENT_SET, COMPONENT는 디자인 시스템 컴포넌트이므로 패스
+    if (node.type === 'COMPONENT_SET' || node.type === 'COMPONENT') {
+      results.push({
+        nodeId: node.id,
+        name: node.name,
+        type: 'component',
+        detail: '디자인 시스템 컴포넌트',
+        badge: '적용됨',
+        isApplied: true,
+        severity: 'success'
+      });
+      return;
+    }
+
+    // INSTANCE는 컴포넌트 인스턴스이므로 적용됨
+    if (node.type === 'INSTANCE') {
+      // 메인 컴포넌트 정보 확인
+      let componentName = '알 수 없는 컴포넌트';
+      try {
+        if (node.mainComponent) {
+          componentName = node.mainComponent.name;
+        }
+      } catch (e) {}
+
+      results.push({
+        nodeId: node.id,
+        name: node.name,
+        type: 'component',
+        detail: `인스턴스: ${componentName}`,
+        badge: '적용됨',
+        isApplied: true,
+        severity: 'success'
+      });
+
+      // 인스턴스 내부는 검사하지 않음
+      return;
+    }
+
+    // FRAME, GROUP, SECTION 등 컨테이너는 컴포넌트가 아닌 일반 레이어
+    if (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'SECTION') {
+      results.push({
+        nodeId: node.id,
+        name: node.name,
+        type: 'component',
+        detail: `${getShortType(node.type)} - 컴포넌트 아님`,
+        badge: '미적용',
+        isApplied: false,
+        severity: 'error'
+      });
+    }
+
+    // 자식 노드 검사
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        checkNode(child);
+      }
+    }
+  }
+
+  for (const node of selection) {
+    checkNode(node);
+  }
+
+  return results;
+}
+
+// 베리어블 체크 - 색상/크기 등에 변수가 적용되지 않은 레이어 찾기
+function checkVariables(selection) {
+  const results = [];
+
+  function checkNode(node) {
+    // fills 체크 (색상 변수)
+    if ('fills' in node && Array.isArray(node.fills) && node.fills !== figma.mixed) {
+      let hasVariableFill = false;
+
+      // boundVariables 체크
+      try {
+        if (node.boundVariables && node.boundVariables.fills) {
+          hasVariableFill = true;
+        }
+      } catch (e) {}
+
+      // fills가 있고 SOLID 타입인데 변수가 적용되지 않은 경우
+      const solidFills = node.fills.filter(fill => fill.type === 'SOLID' && fill.visible !== false);
+
+      if (solidFills.length > 0 && !hasVariableFill) {
+        // 색상 정보 추출
+        const fill = solidFills[0];
+        const hex = rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+
+        results.push({
+          nodeId: node.id,
+          name: node.name,
+          type: 'variable',
+          detail: `Fill 색상: ${hex}`,
+          badge: '미적용',
+          isApplied: false,
+          severity: 'warning'
+        });
+      } else if (hasVariableFill) {
+        results.push({
+          nodeId: node.id,
+          name: node.name,
+          type: 'variable',
+          detail: 'Fill 베리어블 적용됨',
+          badge: '적용됨',
+          isApplied: true,
+          severity: 'success'
+        });
+      }
+    }
+
+    // strokes 체크 (스트로크 색상 변수)
+    if ('strokes' in node && Array.isArray(node.strokes) && node.strokes !== figma.mixed) {
+      let hasVariableStroke = false;
+
+      try {
+        if (node.boundVariables && node.boundVariables.strokes) {
+          hasVariableStroke = true;
+        }
+      } catch (e) {}
+
+      const solidStrokes = node.strokes.filter(stroke => stroke.type === 'SOLID' && stroke.visible !== false);
+
+      if (solidStrokes.length > 0 && !hasVariableStroke) {
+        const stroke = solidStrokes[0];
+        const hex = rgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
+
+        results.push({
+          nodeId: node.id,
+          name: node.name,
+          type: 'variable',
+          detail: `Stroke 색상: ${hex}`,
+          badge: '미적용',
+          isApplied: false,
+          severity: 'warning'
+        });
+      }
+    }
+
+    // 자식 노드 검사
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        checkNode(child);
+      }
+    }
+  }
+
+  for (const node of selection) {
+    checkNode(node);
+  }
+
+  return results;
+}
+
+// ===== Notion 비교 기능 =====
+
+// 노션 내용과 Figma 텍스트 비교
+function compareWithNotion(notionText) {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: 'compare-status',
+      status: 'error',
+      message: '먼저 Figma에서 레이어를 선택해주세요.'
+    });
+    return;
+  }
+
+  // 노션 텍스트 파싱 (키워드 추출)
+  const notionKeywords = parseNotionContent(notionText);
+
+  // Figma에서 모든 텍스트 수집
+  const figmaTexts = [];
+  for (const node of selection) {
+    collectTextsWithInfo(node, figmaTexts);
+  }
+
+  // 비교 수행
+  const results = performComparison(notionKeywords, figmaTexts);
+
+  figma.ui.postMessage({
+    type: 'compare-results',
+    results: results
+  });
+}
+
+// 노션 내용 파싱 - 키워드 추출
+function parseNotionContent(text) {
+  const keywords = [];
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // "- " 또는 "• " 로 시작하는 항목 처리
+    let content = trimmed.replace(/^[-•*]\s*/, '');
+
+    // "제목:", "버튼:", "텍스트:" 등의 라벨 처리
+    const labelMatch = content.match(/^(.+?)[:：]\s*(.+)$/);
+
+    if (labelMatch) {
+      const label = labelMatch[1].trim();
+      const values = labelMatch[2].split(/[,，、]/);
+
+      for (const value of values) {
+        const v = value.trim();
+        if (v) {
+          keywords.push({
+            label: label,
+            text: v,
+            original: content
+          });
+        }
+      }
+    } else {
+      // 라벨 없는 일반 텍스트
+      keywords.push({
+        label: '텍스트',
+        text: content,
+        original: content
+      });
+    }
+  }
+
+  return keywords;
+}
+
+// Figma에서 텍스트 노드 수집 (정보 포함)
+function collectTextsWithInfo(node, results, path = '') {
+  if (node.type === 'TEXT') {
+    const text = node.characters.trim();
+    if (text) {
+      results.push({
+        nodeId: node.id,
+        name: node.name,
+        text: text,
+        path: path ? `${path} > ${node.name}` : node.name
+      });
+    }
+  }
+
+  if ('children' in node && node.children) {
+    const currentPath = path ? `${path} > ${node.name}` : node.name;
+    for (const child of node.children) {
+      collectTextsWithInfo(child, results, currentPath);
+    }
+  }
+}
+
+// 텍스트 비교 수행
+function performComparison(notionKeywords, figmaTexts) {
+  const results = [];
+  const matchedNotionIndices = new Set();
+  const matchedFigmaIndices = new Set();
+
+  // 1. 정확히 일치하는 것 찾기
+  for (let i = 0; i < notionKeywords.length; i++) {
+    const notion = notionKeywords[i];
+
+    for (let j = 0; j < figmaTexts.length; j++) {
+      if (matchedFigmaIndices.has(j)) continue;
+
+      const figma = figmaTexts[j];
+
+      // 정확히 일치
+      if (figma.text === notion.text) {
+        results.push({
+          status: 'match',
+          label: notion.label,
+          expected: notion.text,
+          actual: figma.text,
+          nodeId: figma.nodeId
+        });
+        matchedNotionIndices.add(i);
+        matchedFigmaIndices.add(j);
+        break;
+      }
+    }
+  }
+
+  // 2. 부분 일치 또는 유사한 것 찾기 (불일치)
+  for (let i = 0; i < notionKeywords.length; i++) {
+    if (matchedNotionIndices.has(i)) continue;
+
+    const notion = notionKeywords[i];
+    let bestMatch = null;
+    let bestMatchIndex = -1;
+    let bestSimilarity = 0;
+
+    for (let j = 0; j < figmaTexts.length; j++) {
+      if (matchedFigmaIndices.has(j)) continue;
+
+      const figma = figmaTexts[j];
+
+      // 포함 관계 체크
+      const similarity = calculateSimilarity(notion.text, figma.text);
+
+      if (similarity > bestSimilarity && similarity > 0.3) {
+        bestSimilarity = similarity;
+        bestMatch = figma;
+        bestMatchIndex = j;
+      }
+    }
+
+    if (bestMatch) {
+      results.push({
+        status: 'mismatch',
+        label: notion.label,
+        expected: notion.text,
+        actual: bestMatch.text,
+        nodeId: bestMatch.nodeId
+      });
+      matchedNotionIndices.add(i);
+      matchedFigmaIndices.add(bestMatchIndex);
+    }
+  }
+
+  // 3. 매칭되지 않은 노션 키워드 (누락)
+  for (let i = 0; i < notionKeywords.length; i++) {
+    if (matchedNotionIndices.has(i)) continue;
+
+    const notion = notionKeywords[i];
+    results.push({
+      status: 'missing',
+      label: notion.label,
+      expected: notion.text,
+      actual: '',
+      nodeId: null
+    });
+  }
+
+  return results;
+}
+
+// 문자열 유사도 계산 (Jaccard 유사도 기반)
+function calculateSimilarity(str1, str2) {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+
+  // 한 문자열이 다른 문자열을 포함하면 높은 유사도
+  if (s1.includes(s2) || s2.includes(s1)) {
+    return 0.8;
+  }
+
+  // 문자 단위 Jaccard 유사도
+  const set1 = new Set(s1.split(''));
+  const set2 = new Set(s2.split(''));
+
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+
+  return intersection.size / union.size;
+}
+
+// 텍스트 스타일 체크 - 텍스트 스타일이 적용되지 않은 텍스트 레이어 찾기
+function checkTextStyles(selection) {
+  const results = [];
+
+  function checkNode(node) {
+    // 텍스트 노드만 검사
+    if (node.type === 'TEXT') {
+      // textStyleId 체크
+      let hasTextStyle = false;
+      let styleName = '';
+
+      try {
+        if (node.textStyleId && node.textStyleId !== figma.mixed && node.textStyleId !== '') {
+          hasTextStyle = true;
+          // 스타일 이름 가져오기
+          const style = figma.getStyleById(node.textStyleId);
+          if (style) {
+            styleName = style.name;
+          }
+        }
+      } catch (e) {}
+
+      if (hasTextStyle) {
+        results.push({
+          nodeId: node.id,
+          name: node.name,
+          type: 'textstyle',
+          detail: `스타일: ${styleName}`,
+          badge: '적용됨',
+          isApplied: true,
+          severity: 'success'
+        });
+      } else {
+        // 폰트 정보 추출
+        let fontInfo = '';
+        try {
+          if (node.fontName !== figma.mixed) {
+            fontInfo = `${node.fontName.family} ${node.fontName.style}`;
+          } else {
+            fontInfo = '혼합 폰트';
+          }
+
+          if (node.fontSize !== figma.mixed) {
+            fontInfo += ` / ${node.fontSize}px`;
+          }
+        } catch (e) {
+          fontInfo = '폰트 정보 없음';
+        }
+
+        results.push({
+          nodeId: node.id,
+          name: node.name,
+          type: 'textstyle',
+          detail: fontInfo,
+          badge: '미적용',
+          isApplied: false,
+          severity: 'error'
+        });
+      }
+    }
+
+    // INSTANCE 내부의 텍스트도 검사
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        checkNode(child);
+      }
+    }
+  }
+
+  for (const node of selection) {
+    checkNode(node);
+  }
+
+  return results;
+}

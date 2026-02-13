@@ -1,0 +1,8 @@
+FieldName,Category,Description,Values
+FollowersText,creator,팔로워 수,"5.3K 팔로워, 12.1K 팔로워, 890 팔로워, 45.2K 팔로워, 3.2K 팔로워"
+PostsText,creator,포스트 수,"140 포스트, 89 포스트, 256 포스트, 42 포스트, 178 포스트"
+bioText,creator,소개글,"에몽에몽 라이키에 등장!, 일상을 공유하는 크리에이터입니다 ✨, 여행과 맛집을 좋아하는 사람 🌏"
+ChatLastMessage,message,마지막 메시지,"아 22:30~이후 때만 멤버한테 톡톡..., 안녕하세요! 문의 주셔서 감사해요, 네 확인했습니다~, 곧 공지 올릴게요!"
+ChatLastMessageTime,message,메시지 시각,"05월 16일, 오전 10:30, 어제, 3일 전"
+FanLastMessage,fan,마지막 메시지,"응원합니다!, 새 영상 너무 좋았어요 ㅠㅠ, 항상 응원해요!"
+FanLastMessageTime,fan,메시지 시각,"05월 16일, 오전 10:30, 어제, 방금 전"

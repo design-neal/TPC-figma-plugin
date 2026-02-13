@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F3F4F5;
+      color: #110F1A;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 탭 스타일 */
+    .tabs-container {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #F3F4F5;
+      border-bottom: 1px solid #D7D8E5;
+      flex-shrink: 0;
+    }
+
+    .tabs {
+      display: flex;
+      background: transparent;
+      position: relative;
+      overflow-x: scroll;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding: 0 20px;
+      gap: 24px;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab {
+      flex: 0 0 auto;
+      height: 42px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 500;
+      color: #838499;
+      background: transparent;
+      border: none;
+      cursor: grab;
+      position: relative;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .tab.active {
+      color: #110F1A;
+      font-weight: 600;
+    }
+
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: #110F1A;
+      border-radius: 2px;
+    }
+
+    /* 콘텐츠 영역 스크롤 컨테이너 */
+    .content-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-top: 20px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 타이틀 섹션 */
+    .title-section {
+      padding: 28px 20px 12px 20px;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #110F1A;
+    }
+
+    /* 메인 컨텐츠 */
+    .main-content {
+      padding: 0 20px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* 카드 */
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #110F1A;
+    }
+
+    /* 네이밍 아이템 리스트 */
+    .naming-list {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 20px;
+    }
+
+    .naming-item {
+      display: flex;
+      align-items: center;
+      height: 60px;
+      cursor: pointer;
+    }
+
+    .naming-item .icon {
+      width: 24px;
+      height: 24px;
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .naming-item .icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .naming-item .label {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #110F1A;
+    }
+
+    .naming-item .radio {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #D7D8E5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #D7D8E5;
+    }
+
+    .naming-item .radio::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .naming-item .radio.active {
+      border-color: #FF424D;
+      background: #FF424D;
+    }
+
+    /* 버튼 그룹 */
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .button-group.horizontal {
+      flex-direction: row;
+      gap: 8px;
+    }
+
+    .button-group.horizontal .btn {
+      flex: 1;
+    }
+
+    .btn {
+      width: 100%;
+      height: 52px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 16px;
+    }
+
+    .btn-primary {
+      background: #120E33;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #1a1545;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #110F1A;
+      border: 1px solid #D7D8E5;
+    }
+
+    .btn-secondary:hover {
+      background: #F9FAFB;
+    }
+
+    /* 상태 메시지 */
+    .status {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .status.show {
+      display: block;
+    }
+
+    .status.success {
+      background: #ECFDF5;
+      color: #059669;
+    }
+
+    .status.error {
+      background: #FEF2F2;
+      color: #DC2626;
+    }
+
+    .status.info {
+      background: #EFF6FF;
+      color: #2563EB;
+    }
+
+    /* Bridge 탭 스타일 */
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #5A5A73;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 16px;
+      border: 1px solid #D7D8E5;
+      border-radius: 12px;
+      font-size: 14px;
+      resize: none;
+      height: 100px;
+      font-family: inherit;
+      background: #fff;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #110F1A;
+    }
+
+    .examples-section {
+      margin-top: 20px;
+    }
+
+    .examples-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #9CA3AF;
+      margin-bottom: 8px;
+    }
+
+    .example-item {
+      font-size: 13px;
+      color: #5A5A73;
+      padding: 12px 16px;
+      background: #F3F4F5;
+      border-radius: 12px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .example-item:hover {
+      background: #E5E7EB;
+    }
+
+    /* 맞춤법 검사 결과 */
+    .spell-results {
+      margin-top: 10px;
+      display: none;
+    }
+
+    .spell-results.show {
+      display: block;
+    }
+
+    .spell-item {
+      background: #FFFBEB;
+      border: 1px solid #FCD34D;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .spell-item .original {
+      color: #DC2626;
+      text-decoration: line-through;
+    }
+
+    .spell-item .correct {
+      color: #059669;
+      font-weight: 600;
+    }
+
+    .spell-item .fix-btn {
+      background: #120E33;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    .spell-ok {
+      background: #ECFDF5;
+      color: #059669;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    /* 리사이즈 핸들 */
+    .resize-handle {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 9999;
+    }
+
+    .resize-handle::before {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      right: 3px;
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid #C7CAD9;
+      border-bottom: 2px solid #C7CAD9;
+    }
+
+    /* Data Fill 스타일 */
+    .category-tabs {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .category-tab {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5A5A73;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .category-tab:hover {
+      border-color: #110F1A;
+    }
+
+    .category-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
+    .field-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .field-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      background: #F9FAFB;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .field-item:hover {
+      background: #F3F4F5;
+    }
+
+    .field-item.selected {
+      background: #EEF2FF;
+      border: 1px solid #6366F1;
+    }
+
+    .field-item .field-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: #110F1A;
+    }
+
+    .field-item .field-desc {
+      font-size: 12px;
+      color: #838499;
+      margin-right: 8px;
+    }
+
+    .field-item .field-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid #D7D8E5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .field-item.selected .field-check {
+      background: #6366F1;
+      border-color: #6366F1;
+    }
+
+    .field-item.selected .field-check::after {
+      content: '✓';
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .data-preview {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: #F9FAFB;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #5A5A73;
+    }
+
+    .data-preview-title {
+      font-weight: 600;
+      color: #110F1A;
+      margin-bottom: 4px;
+    }
+
+    .data-preview-value {
+      font-family: 'SF Mono', Monaco, monospace;
+      color: #6366F1;
+    }
+
+    /* Checker 탭 스타일 */
+    .checker-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .checker-tab {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5A5A73;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .checker-tab:hover {
+      border-color: #110F1A;
+    }
+
+    .checker-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
+    .checker-summary {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      flex: 1;
+      padding: 16px;
+      background: #F9FAFB;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .summary-card.error {
+      background: #FEF2F2;
+    }
+
+    .summary-card.success {
+      background: #ECFDF5;
+    }
+
+    .summary-number {
+      font-size: 24px;
+      font-weight: 700;
+      color: #110F1A;
+    }
+
+    .summary-card.error .summary-number {
+      color: #DC2626;
+    }
+
+    .summary-card.success .summary-number {
+      color: #059669;
+    }
+
+    .summary-label {
+      font-size: 11px;
+      color: #838499;
+      margin-top: 4px;
+    }
+
+    .checker-results {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .checker-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .checker-item:hover {
+      background: #FEE2E2;
+    }
+
+    .checker-item.warning {
+      background: #FFFBEB;
+      border-color: #FCD34D;
+    }
+
+    .checker-item.warning:hover {
+      background: #FEF3C7;
+    }
+
+    .checker-item-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .checker-item-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .checker-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .checker-item-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #110F1A;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .checker-item-detail {
+      font-size: 11px;
+      color: #838499;
+      margin-top: 2px;
+    }
+
+    .checker-item-badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      background: #DC2626;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .checker-item.warning .checker-item-badge {
+      background: #D97706;
+    }
+
+    .checker-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: #838499;
+    }
+
+    .checker-empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .checker-empty-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .checker-empty-subtext {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .checker-loading {
+      padding: 40px 20px;
+      text-align: center;
+      color: #838499;
+    }
+
+    .checker-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #E5E7EB;
+      border-top-color: #110F1A;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Compare 탭 스타일 */
+    .compare-input-section {
+      margin-bottom: 16px;
+    }
+
+    .compare-textarea {
+      width: 100%;
+      height: 120px;
+      padding: 12px;
+      border: 1px solid #D7D8E5;
+      border-radius: 12px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      background: #fff;
+    }
+
+    .compare-textarea:focus {
+      outline: none;
+      border-color: #110F1A;
+    }
+
+    .compare-source-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .compare-source-tab {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5A5A73;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .compare-source-tab:hover {
+      border-color: #110F1A;
+    }
+
+    .compare-source-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
+    .compare-results {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .compare-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .compare-item.match {
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+    }
+
+    .compare-item.mismatch {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+    }
+
+    .compare-item.missing {
+      background: #FFFBEB;
+      border: 1px solid #FCD34D;
+    }
+
+    .compare-item:hover {
+      opacity: 0.9;
+    }
+
+    .compare-item-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+      font-size: 14px;
+    }
+
+    .compare-item.match .compare-item-icon {
+      background: #D1FAE5;
+    }
+
+    .compare-item.mismatch .compare-item-icon {
+      background: #FEE2E2;
+    }
+
+    .compare-item.missing .compare-item-icon {
+      background: #FEF3C7;
+    }
+
+    .compare-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .compare-item-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #838499;
+      margin-bottom: 4px;
+    }
+
+    .compare-item-text {
+      font-size: 13px;
+      color: #110F1A;
+      word-break: break-word;
+    }
+
+    .compare-item-diff {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #E5E7EB;
+    }
+
+    .compare-item-expected {
+      font-size: 12px;
+      color: #059669;
+    }
+
+    .compare-item-actual {
+      font-size: 12px;
+      color: #DC2626;
+      margin-top: 2px;
+    }
+
+    .compare-summary-bar {
+      display: flex;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #F9FAFB;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .compare-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .compare-stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .compare-stat-dot.match { background: #059669; }
+    .compare-stat-dot.mismatch { background: #DC2626; }
+    .compare-stat-dot.missing { background: #D97706; }
+
+    .notion-url-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #D7D8E5;
+      border-radius: 12px;
+      font-size: 13px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+
+    .notion-url-input:focus {
+      outline: none;
+      border-color: #110F1A;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- 리사이즈 핸들 -->
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <!-- 탭 헤더 -->
+  <div class="tabs-container">
+    <div class="tabs" id="tabsScroller">
+      <button class="tab active" data-tab="export">Data Fill</button>
+      <button class="tab" data-tab="bridge">Text Editor</button>
+      <button class="tab" data-tab="rename">Rename</button>
+      <button class="tab" data-tab="style">Checker</button>
+    </div>
+  </div>
+
+  <!-- 스크롤 가능한 콘텐츠 영역 -->
+  <div class="content-wrapper">
+
+  <!-- Rename 탭 -->
+  <div class="tab-content" id="rename-tab">
+    <div class="main-content">
+      <div class="card">
+        <h2 class="card-title">Selected Naming</h2>
+        <div class="naming-list">
+          <div class="naming-item" data-value="Content">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#110F1A" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+              </svg>
+            </div>
+            <span class="label">Content</span>
+            <div class="radio active"></div>
+          </div>
+          <div class="naming-item" data-value="Section">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#110F1A" stroke-width="2">
+                <rect x="3" y="3" width="18" height="6" rx="1"/>
+                <rect x="3" y="12" width="18" height="9" rx="1"/>
+              </svg>
+            </div>
+            <span class="label">Section</span>
+            <div class="radio"></div>
+          </div>
+          <div class="naming-item" data-value="Item">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#110F1A" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
+              </svg>
+            </div>
+            <span class="label">Item</span>
+            <div class="radio"></div>
+          </div>
+          <div class="naming-item" data-value="Image">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#110F1A" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+            </div>
+            <span class="label">Image</span>
+            <div class="radio"></div>
+          </div>
+          <div class="naming-item" data-value="Text">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#110F1A" stroke-width="2">
+                <polyline points="4 7 4 4 20 4 20 7"/>
+                <line x1="9" y1="20" x2="15" y2="20"/>
+                <line x1="12" y1="4" x2="12" y2="20"/>
+              </svg>
+            </div>
+            <span class="label">Text</span>
+            <div class="radio"></div>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" id="selectedChangeBtn">선택 레이어 변경</button>
+          <button class="btn btn-secondary" id="autoRenameBtn">자동 네이밍</button>
+        </div>
+      </div>
+
+      <div class="status" id="renameStatus"></div>
+    </div>
+  </div>
+
+  <!-- Bridge 탭 -->
+  <div class="tab-content" id="bridge-tab">
+    <div class="main-content">
+      <!-- 직접 텍스트 변경 카드 -->
+      <div class="card">
+        <h2 class="card-title">텍스트 직접 변경</h2>
+        <div class="input-group">
+          <textarea id="directText" placeholder="선택한 레이어의 텍스트를 이 내용으로 변경합니다"></textarea>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" id="directChangeBtn">선택 레이어 텍스트 변경</button>
+        </div>
+      </div>
+
+      <!-- 찾아서 변경 카드 -->
+      <div class="card">
+        <h2 class="card-title">찾아서 변경</h2>
+        <div class="input-group">
+          <textarea id="command" placeholder="예: 기존텍스트>새텍스트"></textarea>
+        </div>
+
+        <div class="button-group horizontal">
+          <button class="btn btn-secondary" id="spellCheckBtn">맞춤법 검사</button>
+          <button class="btn btn-primary" id="executeBtn">텍스트 변경</button>
+        </div>
+
+        <div class="examples-section">
+          <div class="examples-title">명령어 예시</div>
+          <div class="example-item" data-cmd="팔로워(전체)>전체 메시지">찾아서 변경: 기존텍스트>새텍스트</div>
+          <div class="example-item" data-cmd=">새 텍스트">전체 변경: >새텍스트</div>
+        </div>
+      </div>
+
+      <div class="status" id="bridgeStatus"></div>
+      <div class="spell-results" id="spellResults"></div>
+    </div>
+  </div>
+
+  <!-- Data Fill 탭 -->
+  <div class="tab-content active" id="export-tab">
+    <div class="main-content">
+      <div class="card">
+        <div class="category-tabs">
+          <button class="category-tab active" data-category="creator">크리에이터</button>
+          <button class="category-tab" data-category="fan">팬</button>
+        </div>
+
+        <div class="field-list" id="fieldList">
+          <!-- 필드 목록이 여기에 동적으로 생성됨 -->
+        </div>
+
+        <div class="data-preview" id="dataPreview" style="display: none;">
+          <div class="data-preview-title">미리보기</div>
+          <div class="data-preview-value" id="previewValue"></div>
+        </div>
+
+        <div class="button-group" style="margin-top: 16px;">
+          <button class="btn btn-primary" id="applyDataBtn">선택 레이어에 적용</button>
+          <button class="btn btn-secondary" id="randomFillBtn">랜덤 채우기</button>
+        </div>
+      </div>
+
+      <div class="status" id="dataFillStatus"></div>
+    </div>
+  </div>
+
+  <!-- Checker 탭 -->
+  <div class="tab-content" id="style-tab">
+    <div class="main-content">
+      <div class="card">
+        <h2 class="card-title">Design System Checker</h2>
+
+        <div class="checker-tabs">
+          <button class="checker-tab active" data-checker="component">
+            🧩 컴포넌트
+          </button>
+          <button class="checker-tab" data-checker="variable">
+            🎨 베리어블
+          </button>
+          <button class="checker-tab" data-checker="textstyle">
+            📝 텍스트
+          </button>
+        </div>
+
+        <div class="checker-summary" id="checkerSummary">
+          <div class="summary-card" id="summaryTotal">
+            <div class="summary-number">-</div>
+            <div class="summary-label">전체 레이어</div>
+          </div>
+          <div class="summary-card error" id="summaryError">
+            <div class="summary-number">-</div>
+            <div class="summary-label">미적용</div>
+          </div>
+          <div class="summary-card success" id="summarySuccess">
+            <div class="summary-number">-</div>
+            <div class="summary-label">적용됨</div>
+          </div>
+        </div>
+
+        <div class="checker-results" id="checkerResults">
+          <div class="checker-empty">
+            <div class="checker-empty-icon">🔍</div>
+            <div class="checker-empty-text">레이어를 선택하고 스캔하세요</div>
+            <div class="checker-empty-subtext">선택한 레이어에서 디자인 시스템 적용 여부를 확인합니다</div>
+          </div>
+        </div>
+
+        <div class="button-group" style="margin-top: 16px;">
+          <button class="btn btn-primary" id="scanDesignBtn">🔍 선택 레이어 스캔</button>
+          <button class="btn btn-secondary" id="selectAllErrorsBtn">⚠️ 미적용 레이어 모두 선택</button>
+        </div>
+      </div>
+
+      <div class="status" id="checkerStatus"></div>
+    </div>
+  </div>
+
+  </div><!-- content-wrapper 닫기 -->
+
+  <script>
+    // ===== 탭 드래그 스크롤 =====
+    const tabsScroller = document.getElementById('tabsScroller');
+    let isTabDragging = false;
+    let tabStartX;
+    let tabScrollLeft;
+
+    tabsScroller.addEventListener('mousedown', (e) => {
+      isTabDragging = true;
+      tabsScroller.style.cursor = 'grabbing';
+      tabStartX = e.pageX - tabsScroller.offsetLeft;
+      tabScrollLeft = tabsScroller.scrollLeft;
+    });
+
+    tabsScroller.addEventListener('mouseleave', () => {
+      isTabDragging = false;
+      tabsScroller.style.cursor = 'grab';
+    });
+
+    tabsScroller.addEventListener('mouseup', () => {
+      isTabDragging = false;
+      tabsScroller.style.cursor = 'grab';
+    });
+
+    tabsScroller.addEventListener('mousemove', (e) => {
+      if (!isTabDragging) return;
+      e.preventDefault();
+      const x = e.pageX - tabsScroller.offsetLeft;
+      const walk = (x - tabStartX) * 1.5;
+      tabsScroller.scrollLeft = tabScrollLeft - walk;
+    });
+
+    // 탭 전환
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = (e) => {
+        // 드래그 중이면 클릭 무시
+        if (Math.abs(e.pageX - tabsScroller.offsetLeft - tabStartX) > 5) return;
+
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+      };
+    });
+
+    // ===== Rename 탭 =====
+    let selectedNaming = 'Content';
+    const renameStatus = document.getElementById('renameStatus');
+
+    document.querySelectorAll('.naming-item').forEach(item => {
+      item.onclick = () => {
+        document.querySelectorAll('.naming-item .radio').forEach(r => r.classList.remove('active'));
+        item.querySelector('.radio').classList.add('active');
+        selectedNaming = item.dataset.value;
+      };
+    });
+
+    function showRenameStatus(message, type) {
+      renameStatus.textContent = message;
+      renameStatus.className = 'status show ' + type;
+    }
+
+    document.getElementById('selectedChangeBtn').onclick = () => {
+      showRenameStatus('처리 중...', 'info');
+      parent.postMessage({
+        pluginMessage: { type: 'rename-selected', namingType: selectedNaming }
+      }, '*');
+    };
+
+    document.getElementById('autoRenameBtn').onclick = () => {
+      showRenameStatus('자동 네이밍 중...', 'info');
+      parent.postMessage({ pluginMessage: { type: 'auto-rename' } }, '*');
+    };
+
+    // ===== Bridge 탭 =====
+    const commandInput = document.getElementById('command');
+    const directTextInput = document.getElementById('directText');
+    const bridgeStatus = document.getElementById('bridgeStatus');
+    const spellResults = document.getElementById('spellResults');
+
+    function showBridgeStatus(message, type) {
+      bridgeStatus.textContent = message;
+      bridgeStatus.className = 'status show ' + type;
+    }
+
+    // 직접 텍스트 변경 버튼
+    document.getElementById('directChangeBtn').onclick = () => {
+      const newText = directTextInput.value;
+      if (!newText) {
+        showBridgeStatus('변경할 텍스트를 입력해주세요', 'error');
+        return;
+      }
+      showBridgeStatus('텍스트 변경 중...', 'info');
+      parent.postMessage({
+        pluginMessage: { type: 'direct-text-change', text: newText }
+      }, '*');
+    };
+
+    document.getElementById('executeBtn').onclick = () => {
+      const command = commandInput.value.trim();
+      if (!command) {
+        showBridgeStatus('명령어를 입력해주세요', 'error');
+        return;
+      }
+      showBridgeStatus('처리 중...', 'info');
+      parent.postMessage({ pluginMessage: { type: 'execute-command', command } }, '*');
+    };
+
+    document.getElementById('spellCheckBtn').onclick = () => {
+      showBridgeStatus('맞춤법 검사 중...', 'info');
+      spellResults.className = 'spell-results';
+      spellResults.innerHTML = '';
+      parent.postMessage({ pluginMessage: { type: 'spell-check' } }, '*');
+    };
+
+    document.querySelectorAll('.example-item').forEach(el => {
+      el.onclick = () => { commandInput.value = el.dataset.cmd; };
+    });
+
+    // ===== 메시지 수신 =====
+    let selectionCount = 0;  // 현재 Figma에서 선택된 레이어 개수
+    let matchingLayerCount = 0;  // 선택된 필드명과 일치하는 레이어 개수
+
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+
+      if (msg.type === 'status') showBridgeStatus(msg.message, msg.status);
+      if (msg.type === 'rename-status') showRenameStatus(msg.message, msg.status);
+      if (msg.type === 'data-fill-status') showDataFillStatus(msg.message, msg.status);
+
+      // Figma 선택 변경 시 미리보기 업데이트
+      if (msg.type === 'selection-update') {
+        selectionCount = msg.count;
+        matchingLayerCount = msg.matchingCount || 0;
+        updatePreview();
+      }
+
+      if (msg.type === 'spell-results') {
+        bridgeStatus.className = 'status';
+        spellResults.className = 'spell-results show';
+
+        if (msg.errors.length === 0) {
+          spellResults.innerHTML = '<div class="spell-ok">맞춤법 오류가 없습니다!</div>';
+        } else {
+          spellResults.innerHTML = msg.errors.map((err, idx) => `
+            <div class="spell-item">
+              <div><span class="original">${err.original}</span> → <span class="correct">${err.correct}</span></div>
+              <div style="color:#5A5A73;margin-top:6px;font-size:12px;">${err.help || ''}</div>
+              <button class="fix-btn" data-idx="${idx}">수정하기</button>
+            </div>
+          `).join('');
+
+          spellResults.querySelectorAll('.fix-btn').forEach(btn => {
+            btn.onclick = () => {
+              const idx = parseInt(btn.dataset.idx);
+              const err = msg.errors[idx];
+              parent.postMessage({
+                pluginMessage: { type: 'execute-command', command: `${err.original}>${err.correct}` }
+              }, '*');
+            };
+          });
+        }
+      }
+
+      if (msg.type === 'check-spelling') checkSpelling(msg.texts);
+
+      // Checker 관련 메시지
+      if (msg.type === 'checker-status') showCheckerStatus(msg.message, msg.status);
+      if (msg.type === 'checker-results') {
+        checkerResults[msg.checkerType] = msg.results;
+        renderCheckerResults();
+        showCheckerStatus(`스캔 완료: ${msg.results.filter(r => !r.isApplied).length}개 미적용 발견`, 'success');
+      }
+
+      // Compare 관련 메시지
+      if (msg.type === 'compare-status') showCompareStatus(msg.message, msg.status);
+      if (msg.type === 'compare-results') {
+        renderCompareResults(msg.results);
+        const mismatchCount = msg.results.filter(r => r.status === 'mismatch').length;
+        const missingCount = msg.results.filter(r => r.status === 'missing').length;
+        if (mismatchCount + missingCount === 0) {
+          showCompareStatus('모든 내용이 일치합니다! 🎉', 'success');
+        } else {
+          showCompareStatus(`${mismatchCount}개 불일치, ${missingCount}개 누락 발견`, 'error');
+        }
+      }
+    };
+
+    async function checkSpelling(texts) {
+      const errors = [];
+      for (const text of texts) {
+        try {
+          const response = await fetch('https://m.search.naver.com/p/csearch/ocontent/util/SpellerProxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `q=${encodeURIComponent(text)}`
+          });
+          const data = await response.json();
+          if (data.message?.result?.errata_count > 0) {
+            const result = data.message.result;
+            if (result.html !== result.notag_html) {
+              errors.push({ original: text, correct: result.notag_html, help: `${result.errata_count}개 오류 발견` });
+            }
+          }
+        } catch (e) { console.error('맞춤법 검사 오류:', e); }
+      }
+      const uniqueErrors = errors.filter((err, idx, self) =>
+        idx === self.findIndex(e => e.original === err.original && e.correct === err.correct)
+      ).filter(err => err.original !== err.correct);
+      parent.postMessage({ pluginMessage: { type: 'spell-check-response', errors: uniqueErrors } }, '*');
+    }
+
+    // ===== Data Fill 탭 =====
+    // Google Sheets 설정
+    const SHEET_ID = '1GxYVsB6zmrp9bwhm_MjY-a8QQLolk0O1XjqpYPwkJXc';
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+    // 기본 더미 데이터 (Google Sheets 로드 실패 시 사용)
+    // 시트 구조: 각 열이 필드명, 각 행이 데이터
+    let dummyData = {
+      creator: [
+        { name: 'Name', desc: '크리에이터 이름', values: [
+          'Fairy 禹霏@170 Beauty', '朱里ｻﾏ🇯🇵-shurisama-', 'ナツミシャトンヌ🇯🇵', 'Babe Bella Lynn', 'sulittleli蘇小立❤️',
+          '뉴트럴매거진 Neutral Mag', '서하 SEOHA🪄🪽🐰', '지아🌸apple zia🍎🌸', '🐣레이싱모델민유아🐣', '이아이올시다😈',
+          '마루에몽', '솜이', 'soi', 'Sumin🐭', '하앙 🫦 하영',
+          '양이', 'Miko❤️', '꽁주', 'Mana', '豬蒂 Judy', 'MOEILIN 🐈‍⬛'
+        ] },
+        { name: 'Handle', desc: '@핸들', values: [
+          '@z_fk_z', '@shurisama', '@natsumiokinawa', '@babebellalynn', '@sulittleli',
+          '@neutralmagazine', '@seoha_official', '@apple_zia', '@minyua_racing', '@iaiolsida',
+          '@maruemong', '@som2', '@soi_official', '@sumin_mouse', '@hayang_ha',
+          '@yang2', '@miko_heart', '@kkongju', '@mana_official', '@judy_pig', '@moeilin'
+        ] },
+        { name: 'Avatar', desc: '프로필 이미지', values: [] },
+        { name: 'FollowersText', desc: '팔로워 수', values: [
+          '17.8K', '6.8K', '6.8K', '104.6K', '7.8K', '15.2K', '23.1K', '8.9K', '12.4K', '5.6K',
+          '45.3K', '18.7K', '9.2K', '11.5K', '7.3K', '4.8K', '22.1K', '6.1K', '8.4K', '13.9K', '257K'
+        ] },
+        { name: 'PostsText', desc: '포스트 수', values: [
+          '467', '78', '214', '40', '276', '523', '189', '342', '156', '87',
+          '421', '234', '167', '298', '145', '112', '387', '93', '256', '178', '758'
+        ] },
+        { name: 'BioText', desc: '소개글', values: [
+          'A Taiwanese model with beautiful legs', '鶴薗朱里叶(休止中...)', '日本🇯🇵 で活動中', 'Ur little Canadian Naughty Girl', '小立的獨家照片只有在這看得到',
+          '패션 & 라이프스타일 매거진', '모델 서하입니다 💕', '사과처럼 상큼하게 🍎', '레이싱모델 민유아', '이아이올시다 공식',
+          '마루에몽이에요~', '솜이의 일상', 'soi 입니다', '수민이의 하루', '하영이에요 🫦',
+          '양이 공식 계정', 'Miko 입니다 ❤️', '꽁주예요~', 'Mana Official', 'Judy 豬蒂', 'MOEILIN Official 🐈‍⬛'
+        ] }
+      ],
+      fan: [
+        { name: 'Name', desc: '팬 이름', values: [
+          'yeony_babe', '킹애봉', 'Sato Toshio', '지후', '예진', 'Yamamoto Kenji', '담연',
+          '봉주르', '슈거베베', '달빛소나타', '하늘바라기', '꿈꾸는소녀', 'Chen Wei', '별빛천사',
+          '행복한하루', 'Kim Minji', '사랑해요', '은하수', '초코파이', 'Lee Junho', '무지개빛',
+          '달콤한인생', '햇살가득', 'Park Sooyoung', '꽃보다예쁜', '바람처럼', '구름위의산책',
+          'Tanaka Yuki', '별똥별', '행운의클로버', '달빛요정', 'Wang Xiaoli', '사랑스러운',
+          '꿈의나라', '해피바이러스', 'Suzuki Hana', '별빛정원', '달콤한추억', '무한도전', '하트뿅뿅'
+        ] },
+        { name: 'Handle', desc: '@핸들', values: [
+          '@yeony_babe', '@kingaebong', '@sato_toshio', '@jihu_fan', '@yejin_star', '@yamamoto_k', '@damyeon',
+          '@bonjour_fan', '@sugarbebe', '@moonlight_sonata', '@sky_watcher', '@dreaming_girl', '@chen_wei', '@starlight_angel',
+          '@happy_day', '@kim_minji', '@saranghae', '@milkyway', '@choco_pie', '@lee_junho', '@rainbow_light',
+          '@sweet_life', '@sunshine_full', '@park_sooyoung', '@prettier_flower', '@like_wind', '@cloud_walk',
+          '@tanaka_yuki', '@shooting_star', '@lucky_clover', '@moonlight_fairy', '@wang_xiaoli', '@lovely_one',
+          '@dreamland', '@happy_virus', '@suzuki_hana', '@starlight_garden', '@sweet_memory', '@infinite_challenge', '@heart_bbyong'
+        ] },
+        { name: 'Avatar', desc: '프로필 이미지', values: [] },
+        { name: 'Comment', desc: '댓글', values: [
+          '생축🎉', '언니 생일 축하해🎂', 'お誕生日おめでとうございます🎉', '다리 진짜 예뻐요😍', '최고의 팬이에요💕',
+          '応援してます！', '멤버십 가입했어요!', '오늘도 예쁘네요✨', '항상 응원합니다💪', '사랑해요❤️',
+          '新しい投稿待ってます', '너무 좋아요👍', '팬미팅 언제해요?', '최애입니다🥰', '행복하세요💖',
+          'ファンです！', '예쁜 사진 감사해요📸', '오늘 하루도 화이팅!', '진짜 대박이에요🔥', '사랑합니다💗',
+          '素敵です✨', '팬이 된지 1년째!', '항상 행복하세요😊', '최고예요👑', '응원해요📣',
+          'いつも見てます', '너무 귀여워요🐰', '멋져요💯', '팬심 폭발💥', '사랑해용💕',
+          '頑張ってください', '예쁨 주의보⚠️', '최애 중의 최애💎', '행복 바이러스🦠', '팬이에요!',
+          '大好きです', '오늘도 빛나네요⭐', '사랑스러워요💝', '팬 1호입니다🏆', '항상 감사해요🙏'
+        ] }
+      ]
+    };
+
+    let isDataLoaded = false;
+
+    // Google Sheets에서 특정 시트 데이터 불러오기
+    async function loadSheetData(sheetName) {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+        const response = await fetch(url);
+        const text = await response.text();
+
+        const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+        if (!jsonString || !jsonString[1]) {
+          console.error(`${sheetName} 시트 응답 파싱 실패`);
+          return [];
+        }
+
+        const json = JSON.parse(jsonString[1]);
+        const table = json.table;
+        const result = [];
+
+        const headers = table.cols.map(col => col.label || '');
+        headers.forEach((header, colIdx) => {
+          if (!header) return;
+
+          const values = [];
+          table.rows.forEach(row => {
+            const cell = row.c[colIdx];
+            if (cell && cell.v) {
+              values.push(String(cell.v));
+            }
+          });
+
+          if (values.length > 0) {
+            result.push({ name: header, desc: header, values: values });
+          }
+        });
+
+        return result;
+      } catch (error) {
+        console.error(`${sheetName} 시트 로드 실패:`, error);
+        return [];
+      }
+    }
+
+    // Google Sheets에서 데이터 불러오기 (크리에이터 + 팬)
+    async function loadGoogleSheetsData() {
+      try {
+        console.log('Google Sheets 데이터 로딩 중...');
+
+        // 크리에이터 시트 로드
+        const creatorData = await loadSheetData('크리에이터');
+        // 팬 시트 로드
+        const fanData = await loadSheetData('팬');
+
+        const newData = {
+          creator: creatorData.length > 0 ? creatorData : null,
+          fan: fanData.length > 0 ? fanData : null
+        };
+
+        console.log('Google Sheets 데이터 로드 완료:', newData);
+        return newData;
+      } catch (error) {
+        console.error('Google Sheets 로드 실패:', error);
+        return null;
+      }
+    }
+
+    // 플러그인 시작 시 Google Sheets 데이터 로드
+    async function initializeData() {
+      console.log('initializeData 시작');
+      const sheetsData = await loadGoogleSheetsData();
+
+      // 크리에이터 데이터 업데이트
+      if (sheetsData && sheetsData.creator && sheetsData.creator.length > 0) {
+        dummyData.creator = sheetsData.creator;
+        console.log('크리에이터 데이터 업데이트 완료, 개수:', dummyData.creator[0].values.length);
+      } else {
+        console.log('크리에이터 시트 로드 실패, 기본 데이터 사용');
+      }
+
+      // 팬 데이터 업데이트
+      if (sheetsData && sheetsData.fan && sheetsData.fan.length > 0) {
+        dummyData.fan = sheetsData.fan;
+        console.log('팬 데이터 업데이트 완료, 개수:', dummyData.fan[0].values.length);
+      } else {
+        console.log('팬 시트 로드 실패, 기본 데이터 사용');
+      }
+
+      isDataLoaded = true;
+      renderFields(currentCategory);
+    }
+
+    // 페이지 로드 시 데이터 초기화
+    initializeData();
+
+    let currentCategory = 'creator';
+    let selectedField = null;
+    const fieldList = document.getElementById('fieldList');
+    const dataPreview = document.getElementById('dataPreview');
+    const previewValue = document.getElementById('previewValue');
+    const dataFillStatus = document.getElementById('dataFillStatus');
+
+    // 미리보기 업데이트 함수
+    function updatePreview() {
+      if (!selectedField) {
+        dataPreview.style.display = 'none';
+        return;
+      }
+
+      const fields = dummyData[currentCategory] || [];
+      const field = fields.find(f => f.name === selectedField);
+      if (!field || !field.values || field.values.length === 0) {
+        dataPreview.style.display = 'none';
+        return;
+      }
+
+      dataPreview.style.display = 'block';
+
+      // 일치하는 레이어 개수만큼 미리보기 표시 (최대 5개)
+      const previewCount = Math.min(matchingLayerCount || 1, 5, field.values.length);
+      const previewValues = field.values.slice(0, previewCount);
+
+      if (matchingLayerCount > 0) {
+        previewValue.innerHTML = previewValues.map((v, i) =>
+          `<div style="padding: 4px 0; ${i > 0 ? 'border-top: 1px solid #E5E7EB;' : ''}">${i + 1}. ${v}</div>`
+        ).join('') + (matchingLayerCount > 5 ? `<div style="color: #838499; padding-top: 4px;">... 외 ${matchingLayerCount - 5}개</div>` : '');
+      } else {
+        previewValue.textContent = field.values[0];
+      }
+    }
+
+    function renderFields(category) {
+      const fields = dummyData[category] || [];
+      if (fields.length === 0) {
+        fieldList.innerHTML = '<div style="padding: 20px; color: #838499; text-align: center;">데이터가 없습니다</div>';
+        return;
+      }
+      fieldList.innerHTML = fields.map(field => `
+        <div class="field-item" data-field="${field.name}">
+          <div class="field-check"></div>
+          <span class="field-name">${field.name}</span>
+          <span class="field-desc">${field.desc}</span>
+        </div>
+      `).join('');
+
+      fieldList.querySelectorAll('.field-item').forEach(item => {
+        item.onclick = () => {
+          // 이미 선택된 항목을 다시 클릭하면 선택 해제
+          if (item.classList.contains('selected')) {
+            item.classList.remove('selected');
+            selectedField = null;
+            dataPreview.style.display = 'none';
+          } else {
+            // 다른 항목 선택
+            fieldList.querySelectorAll('.field-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedField = item.dataset.field;
+
+            // 선택 시 Figma에 일치하는 레이어 개수 요청
+            parent.postMessage({
+              pluginMessage: { type: 'count-matching-layers', fieldName: selectedField }
+            }, '*');
+
+            // 미리보기 업데이트 (일치하는 레이어 개수는 Figma에서 응답받으면 업데이트됨)
+            updatePreview();
+          }
+        };
+      });
+    }
+
+    document.querySelectorAll('.category-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCategory = tab.dataset.category;
+        selectedField = null;
+        dataPreview.style.display = 'none';
+        renderFields(currentCategory);
+      };
+    });
+
+    function showDataFillStatus(message, type) {
+      dataFillStatus.textContent = message;
+      dataFillStatus.className = 'status show ' + type;
+    }
+
+    document.getElementById('applyDataBtn').onclick = () => {
+      if (!selectedField) {
+        showDataFillStatus('필드를 선택해주세요', 'error');
+        return;
+      }
+      const field = dummyData[currentCategory].find(f => f.name === selectedField);
+      if (field) {
+        // 이미지 타입인 경우
+        if (field.isImage) {
+          showDataFillStatus('이미지 로딩 중...', 'info');
+          parent.postMessage({
+            pluginMessage: { type: 'apply-image-fill', imageType: field.imageType }
+          }, '*');
+        } else {
+          // 텍스트 타입인 경우
+          const randomValue = field.values[Math.floor(Math.random() * field.values.length)];
+          showDataFillStatus('적용 중...', 'info');
+          parent.postMessage({
+            pluginMessage: { type: 'apply-dummy-data', value: randomValue }
+          }, '*');
+        }
+      }
+    };
+
+    document.getElementById('randomFillBtn').onclick = () => {
+      showDataFillStatus('랜덤 채우기 중...', 'info');
+      parent.postMessage({
+        pluginMessage: { type: 'random-fill', category: currentCategory, data: dummyData[currentCategory] }
+      }, '*');
+    };
+
+    // 초기 렌더링
+    renderFields('creator');
+
+    // ===== Compare 탭 =====
+    let compareSource = 'paste';
+    const compareResults = document.getElementById('compareResults');
+    const compareStatus = document.getElementById('compareStatus');
+    const compareSummary = document.getElementById('compareSummary');
+
+    // 소스 탭 전환
+    document.querySelectorAll('.compare-source-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.compare-source-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        compareSource = tab.dataset.source;
+
+        // 입력 섹션 전환
+        document.getElementById('pasteInputSection').style.display = compareSource === 'paste' ? 'block' : 'none';
+        document.getElementById('notionUrlSection').style.display = compareSource === 'notion' ? 'block' : 'none';
+      };
+    });
+
+    function showCompareStatus(message, type) {
+      compareStatus.textContent = message;
+      compareStatus.className = 'status show ' + type;
+    }
+
+    // 비교 버튼
+    document.getElementById('compareBtn').onclick = () => {
+      let notionText = '';
+
+      if (compareSource === 'paste') {
+        notionText = document.getElementById('notionContent').value.trim();
+      } else {
+        // Notion API 연동 (추후 구현)
+        const pageId = document.getElementById('notionPageId').value.trim();
+        if (!pageId) {
+          showCompareStatus('Notion 페이지 ID를 입력해주세요', 'error');
+          return;
+        }
+        // Notion API로 데이터 가져오기
+        fetchNotionPage(pageId);
+        return;
+      }
+
+      if (!notionText) {
+        showCompareStatus('비교할 내용을 입력해주세요', 'error');
+        return;
+      }
+
+      showCompareStatus('비교 중...', 'info');
+      compareResults.innerHTML = `
+        <div class="checker-loading">
+          <div class="checker-spinner"></div>
+          <div>Figma 텍스트와 비교 중...</div>
+        </div>
+      `;
+
+      // Figma에 비교 요청
+      parent.postMessage({
+        pluginMessage: { type: 'compare-with-notion', notionText: notionText }
+      }, '*');
+    };
+
+    // Notion API로 페이지 가져오기
+    async function fetchNotionPage(pageId) {
+      showCompareStatus('Notion 페이지 로딩 중...', 'info');
+
+      // Notion API는 서버사이드에서만 가능하므로, 현재는 안내 메시지 표시
+      showCompareStatus('Notion API 연동은 준비 중입니다. 직접 입력을 사용해주세요.', 'info');
+    }
+
+    // 비교 결과 렌더링
+    function renderCompareResults(results) {
+      if (!results || results.length === 0) {
+        compareResults.innerHTML = `
+          <div class="checker-empty">
+            <div class="checker-empty-icon">🤔</div>
+            <div class="checker-empty-text">비교할 내용이 없습니다</div>
+            <div class="checker-empty-subtext">Figma에서 레이어를 선택하고 다시 시도해주세요</div>
+          </div>
+        `;
+        compareSummary.style.display = 'none';
+        return;
+      }
+
+      // 통계 계산
+      const matchCount = results.filter(r => r.status === 'match').length;
+      const mismatchCount = results.filter(r => r.status === 'mismatch').length;
+      const missingCount = results.filter(r => r.status === 'missing').length;
+
+      // 요약 표시
+      compareSummary.style.display = 'flex';
+      document.getElementById('matchCount').textContent = matchCount;
+      document.getElementById('mismatchCount').textContent = mismatchCount;
+      document.getElementById('missingCount').textContent = missingCount;
+
+      // 결과 목록 (불일치/누락 우선 표시)
+      const sortedResults = [...results].sort((a, b) => {
+        const order = { mismatch: 0, missing: 1, match: 2 };
+        return order[a.status] - order[b.status];
+      });
+
+      compareResults.innerHTML = sortedResults.map(item => `
+        <div class="compare-item ${item.status}" data-node-id="${item.nodeId || ''}">
+          <div class="compare-item-icon">
+            ${item.status === 'match' ? '✅' : item.status === 'mismatch' ? '❌' : '⚠️'}
+          </div>
+          <div class="compare-item-content">
+            <div class="compare-item-label">${item.label || '텍스트'}</div>
+            <div class="compare-item-text">${item.status === 'missing' ? item.expected : item.actual}</div>
+            ${item.status === 'mismatch' ? `
+              <div class="compare-item-diff">
+                <div class="compare-item-expected">기획: ${item.expected}</div>
+                <div class="compare-item-actual">디자인: ${item.actual}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // 클릭 시 해당 노드 선택
+      compareResults.querySelectorAll('.compare-item').forEach(item => {
+        item.onclick = () => {
+          const nodeId = item.dataset.nodeId;
+          if (nodeId) {
+            parent.postMessage({
+              pluginMessage: { type: 'select-node', nodeId: nodeId }
+            }, '*');
+          }
+        };
+      });
+    }
+
+    // ===== Checker 탭 =====
+    let currentCheckerType = 'component';
+    let checkerResults = { component: [], variable: [], textstyle: [] };
+    const checkerResultsEl = document.getElementById('checkerResults');
+    const checkerStatus = document.getElementById('checkerStatus');
+
+    // 체커 탭 전환
+    document.querySelectorAll('.checker-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.checker-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCheckerType = tab.dataset.checker;
+        renderCheckerResults();
+      };
+    });
+
+    function showCheckerStatus(message, type) {
+      checkerStatus.textContent = message;
+      checkerStatus.className = 'status show ' + type;
+    }
+
+    function updateCheckerSummary(total, errors, success) {
+      document.querySelector('#summaryTotal .summary-number').textContent = total;
+      document.querySelector('#summaryError .summary-number').textContent = errors;
+      document.querySelector('#summarySuccess .summary-number').textContent = success;
+    }
+
+    function renderCheckerResults() {
+      const results = checkerResults[currentCheckerType] || [];
+
+      if (results.length === 0) {
+        checkerResultsEl.innerHTML = `
+          <div class="checker-empty">
+            <div class="checker-empty-icon">✅</div>
+            <div class="checker-empty-text">문제가 없습니다!</div>
+            <div class="checker-empty-subtext">모든 레이어에 디자인 시스템이 적용되어 있습니다</div>
+          </div>
+        `;
+        updateCheckerSummary('-', '-', '-');
+        return;
+      }
+
+      // 요약 업데이트
+      const total = results.length;
+      const errors = results.filter(r => !r.isApplied).length;
+      const success = results.filter(r => r.isApplied).length;
+      updateCheckerSummary(total, errors, success);
+
+      // 미적용 레이어만 표시
+      const errorItems = results.filter(r => !r.isApplied);
+
+      if (errorItems.length === 0) {
+        checkerResultsEl.innerHTML = `
+          <div class="checker-empty">
+            <div class="checker-empty-icon">✅</div>
+            <div class="checker-empty-text">모두 적용됨!</div>
+            <div class="checker-empty-subtext">선택한 레이어에 모두 디자인 시스템이 적용되어 있습니다</div>
+          </div>
+        `;
+        return;
+      }
+
+      checkerResultsEl.innerHTML = errorItems.map(item => `
+        <div class="checker-item ${item.severity === 'warning' ? 'warning' : ''}" data-node-id="${item.nodeId}">
+          <div class="checker-item-icon">
+            ${getCheckerIcon(item.type)}
+          </div>
+          <div class="checker-item-info">
+            <div class="checker-item-name">${item.name}</div>
+            <div class="checker-item-detail">${item.detail}</div>
+          </div>
+          <div class="checker-item-badge">${item.badge}</div>
+        </div>
+      `).join('');
+
+      // 클릭 시 해당 노드 선택
+      checkerResultsEl.querySelectorAll('.checker-item').forEach(item => {
+        item.onclick = () => {
+          const nodeId = item.dataset.nodeId;
+          parent.postMessage({
+            pluginMessage: { type: 'select-node', nodeId: nodeId }
+          }, '*');
+        };
+      });
+    }
+
+    function getCheckerIcon(type) {
+      switch(type) {
+        case 'component':
+          return '<svg viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>';
+        case 'variable':
+          return '<svg viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8m-4-4h8"/></svg>';
+        case 'textstyle':
+          return '<svg viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+        default:
+          return '';
+      }
+    }
+
+    // 스캔 버튼
+    document.getElementById('scanDesignBtn').onclick = () => {
+      showCheckerStatus('스캔 중...', 'info');
+      checkerResultsEl.innerHTML = `
+        <div class="checker-loading">
+          <div class="checker-spinner"></div>
+          <div>디자인 시스템 검사 중...</div>
+        </div>
+      `;
+      parent.postMessage({
+        pluginMessage: { type: 'scan-design-system', checkerType: currentCheckerType }
+      }, '*');
+    };
+
+    // 미적용 레이어 모두 선택 버튼
+    document.getElementById('selectAllErrorsBtn').onclick = () => {
+      const errorItems = checkerResults[currentCheckerType]?.filter(r => !r.isApplied) || [];
+      if (errorItems.length === 0) {
+        showCheckerStatus('미적용 레이어가 없습니다', 'info');
+        return;
+      }
+      const nodeIds = errorItems.map(item => item.nodeId);
+      parent.postMessage({
+        pluginMessage: { type: 'select-multiple-nodes', nodeIds: nodeIds }
+      }, '*');
+    };
+
+    // ===== 리사이즈 기능 =====
+    const resizeHandle = document.getElementById('resizeHandle');
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = window.innerWidth;
+      startHeight = window.innerHeight;
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+
+      const newWidth = Math.max(300, startWidth + (e.clientX - startX));
+      const newHeight = Math.max(400, startHeight + (e.clientY - startY));
+
+      parent.postMessage({
+        pluginMessage: { type: 'resize', width: newWidth, height: newHeight }
+      }, '*');
+    });
+
+    document.addEventListener('mouseup', () => {
+      isResizing = false;
+    });
+  </script>
+</body>
+</html>
