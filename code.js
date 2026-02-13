@@ -169,6 +169,11 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'create-variables') {
     await createVariablesFromTokens(msg.collectionName, msg.tokens);
   }
+
+  // 텍스트 스타일 생성
+  if (msg.type === 'create-text-styles') {
+    await createTextStylesFromTokens(msg.tokens);
+  }
 };
 
 // 선택된 레이어 정보 가져오기
@@ -2337,6 +2342,140 @@ async function createVariablesFromTokens(collectionName, tokens) {
       type: 'variables-status',
       status: 'error',
       message: '베리어블 생성 실패: ' + e.message
+    });
+  }
+}
+
+// ===== Text Styles 생성 기능 =====
+
+// fontWeight 문자열을 Figma fontName style로 변환
+function fontWeightToStyle(weight) {
+  const weightMap = {
+    'regular': 'Regular',
+    'medium': 'Medium',
+    'semibold': 'Semi Bold',
+    'bold': 'Bold',
+    'light': 'Light',
+    'thin': 'Thin',
+    'black': 'Black',
+    'extrabold': 'Extra Bold',
+    'extralight': 'Extra Light'
+  };
+  const normalized = String(weight).toLowerCase().replace(/[\s-_]/g, '');
+  return weightMap[normalized] || 'Regular';
+}
+
+// 텍스트 스타일 생성
+async function createTextStylesFromTokens(tokens) {
+  try {
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: 'info',
+      message: '텍스트 스타일 생성 중...'
+    });
+
+    // 폰트 로드
+    const fontsToLoad = new Set();
+    for (const token of tokens) {
+      const fontFamily = token.fontFamily || 'Inter';
+      const fontStyle = fontWeightToStyle(token.fontWeight || 'Regular');
+      fontsToLoad.add(JSON.stringify({ family: fontFamily, style: fontStyle }));
+    }
+
+    for (const fontStr of fontsToLoad) {
+      const font = JSON.parse(fontStr);
+      try {
+        await figma.loadFontAsync(font);
+      } catch (e) {
+        console.warn(`폰트 로드 실패: ${font.family} ${font.style}`, e);
+        // Inter로 폴백
+        await figma.loadFontAsync({ family: 'Inter', style: font.style });
+      }
+    }
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    const errors = [];
+
+    // 기존 텍스트 스타일 목록 가져오기
+    const existingStyles = figma.getLocalTextStyles();
+    const existingNames = new Set(existingStyles.map(s => s.name));
+
+    for (const token of tokens) {
+      try {
+        // 이미 존재하는 스타일 확인
+        if (existingNames.has(token.name)) {
+          skippedCount++;
+          continue;
+        }
+
+        // 텍스트 스타일 생성
+        const textStyle = figma.createTextStyle();
+        textStyle.name = token.name;
+
+        // 폰트 설정
+        const fontFamily = token.fontFamily || 'Inter';
+        const fontStyle = fontWeightToStyle(token.fontWeight || 'Regular');
+        
+        try {
+          textStyle.fontName = { family: fontFamily, style: fontStyle };
+        } catch (e) {
+          // Inter로 폴백
+          textStyle.fontName = { family: 'Inter', style: fontStyle };
+        }
+
+        // 폰트 크기
+        if (token.fontSize) {
+          textStyle.fontSize = typeof token.fontSize === 'string' 
+            ? parseFloat(token.fontSize) 
+            : token.fontSize;
+        }
+
+        // 라인 높이
+        if (token.lineHeight) {
+          const lh = typeof token.lineHeight === 'string' 
+            ? parseFloat(token.lineHeight) 
+            : token.lineHeight;
+          textStyle.lineHeight = { value: lh, unit: 'PIXELS' };
+        }
+
+        // 자간 (letterSpacing)
+        if (token.letterSpacing !== undefined) {
+          const ls = typeof token.letterSpacing === 'string'
+            ? parseFloat(token.letterSpacing)
+            : token.letterSpacing;
+          textStyle.letterSpacing = { value: ls, unit: 'PIXELS' };
+        }
+
+        createdCount++;
+
+      } catch (e) {
+        errors.push(`${token.name}: ${e.message}`);
+      }
+    }
+
+    // 결과 메시지
+    let message = `✅ ${createdCount}개 텍스트 스타일 생성 완료!`;
+    if (skippedCount > 0) {
+      message += ` (${skippedCount}개 중복 스킵)`;
+    }
+    if (errors.length > 0) {
+      message += `\n⚠️ ${errors.length}개 에러 발생`;
+      console.log('Text style creation errors:', errors);
+    }
+
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: errors.length > 0 ? 'warning' : 'success',
+      message: message
+    });
+
+  } catch (e) {
+    console.error('텍스트 스타일 생성 에러:', e);
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: 'error',
+      message: '텍스트 스타일 생성 실패: ' + e.message
     });
   }
 }

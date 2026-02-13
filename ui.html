@@ -1372,20 +1372,49 @@ export default function Component() {
             </span>
           </button>
         </div>
+
+        <div class="button-group" style="margin-top: 8px;">
+          <button class="btn btn-primary" id="createTextStylesBtn" onclick="createTextStyles()" style="background: #6366F1;">
+            <span class="btn-text">🔤 Text Styles 생성</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              생성 중...
+            </span>
+          </button>
+        </div>
       </div>
 
       <div class="card" style="margin-top: 10px;">
-        <h3 class="card-title" style="font-size: 16px;">💡 사용 예시</h3>
+        <h3 class="card-title" style="font-size: 16px;">💡 베리어블 예시</h3>
         <div class="example-tokens" style="background: #F9FAFB; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 12px; color: #374151; white-space: pre-wrap;">{
   "color/primary/500": "#3B82F6",
   "spacing/md": 16,
-  "radius/lg": 12,
-  "font/family": "Inter"
+  "radius/lg": 12
 }</div>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <h3 class="card-title" style="font-size: 16px;">🔤 Text Styles 예시</h3>
+        <div class="example-tokens" style="background: #F9FAFB; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #374151; white-space: pre-wrap;">[
+  {
+    "name": "Typography/Body 1",
+    "fontFamily": "Inter",
+    "fontWeight": "Regular",
+    "fontSize": 14,
+    "lineHeight": 20
+  },
+  {
+    "name": "Typography/Title 1",
+    "fontFamily": "Inter",
+    "fontWeight": "Bold",
+    "fontSize": 32,
+    "lineHeight": 40
+  }
+]</div>
         <p style="color: #838499; font-size: 12px; margin-top: 8px;">
-          • Color: #HEX, rgb(), rgba() 형식<br>
-          • Number: spacing, radius, size 등<br>
-          • String: font family, 텍스트 등
+          • name: 스타일 이름 (계층 구조 가능)<br>
+          • fontWeight: Regular, Medium, Semibold, Bold<br>
+          • fontSize, lineHeight: 픽셀 단위
         </p>
       </div>
 
@@ -1640,9 +1669,11 @@ export default function Component() {
       if (msg.type === 'variables-status') {
         showVariablesStatus(msg.message, msg.status);
         // 성공 또는 에러 시 로딩 해제
-        if (msg.status === 'success' || msg.status === 'error') {
-          const btn = document.getElementById('createVariablesBtn');
-          if (btn) btn.classList.remove('loading');
+        if (msg.status === 'success' || msg.status === 'error' || msg.status === 'warning') {
+          const btn1 = document.getElementById('createVariablesBtn');
+          const btn2 = document.getElementById('createTextStylesBtn');
+          if (btn1) btn1.classList.remove('loading');
+          if (btn2) btn2.classList.remove('loading');
         }
       }
 
@@ -2383,6 +2414,52 @@ export default function Component() {
       } catch (e) {
         if (btn) btn.classList.remove('loading');
         showVariablesStatus(e.message, 'error');
+      }
+    }
+
+    function createTextStyles() {
+      const btn = document.getElementById('createTextStylesBtn');
+      const jsonInput = document.getElementById('variableJsonInput');
+
+      if (!jsonInput || !jsonInput.value.trim()) {
+        showVariablesStatus('JSON을 입력해주세요', 'error');
+        return;
+      }
+
+      try {
+        // Text Styles는 배열 형식으로 파싱
+        const data = JSON.parse(jsonInput.value);
+        let tokens = [];
+
+        if (Array.isArray(data)) {
+          // 배열 형식: [{name, fontFamily, fontSize, ...}, ...]
+          tokens = data;
+        } else {
+          // 객체 형식: {"name": {...}} 또는 flat 형식
+          showVariablesStatus('Text Styles는 배열 형식 JSON이 필요합니다. 예시를 참고하세요.', 'error');
+          return;
+        }
+
+        if (tokens.length === 0) {
+          showVariablesStatus('토큰이 없습니다', 'error');
+          return;
+        }
+
+        // 로딩 시작
+        if (btn) btn.classList.add('loading');
+        showVariablesStatus('텍스트 스타일 생성 중...', 'info');
+
+        // Figma에 메시지 전송
+        parent.postMessage({
+          pluginMessage: {
+            type: 'create-text-styles',
+            tokens: tokens
+          }
+        }, '*');
+
+      } catch (e) {
+        if (btn) btn.classList.remove('loading');
+        showVariablesStatus('JSON 파싱 실패: ' + e.message, 'error');
       }
     }
 
