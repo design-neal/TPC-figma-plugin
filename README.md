@@ -1,122 +1,85 @@
-# Figma MCP Server
+# Likey Assistant - Figma Plugin
 
-Claude와 Figma를 연동하는 MCP(Model Context Protocol) 서버입니다.
+Likey 팀을 위한 Figma 디자인 워크플로우 플러그인입니다.
 
 ## 기능
 
-- **get_file**: Figma 파일 정보 조회
-- **get_node**: 특정 노드 상세 정보 조회
-- **get_styles**: 파일 스타일 조회
-- **export_image**: 노드를 이미지로 내보내기 (PNG, SVG, JPG, PDF)
-- **get_comments**: 파일 코멘트 조회
+### 1. Data Fill
+- Google Sheets 연동으로 더미 데이터 자동 채우기
+- 크리에이터/팬 카테고리별 데이터 관리
+- 레이어 이름 기반 자동 매칭
 
-## 설치
+### 2. Text Editor
+- 선택한 레이어의 텍스트 직접 변경
+- 찾아서 변경 기능 (기존텍스트>새텍스트)
+- 네이버 맞춤법 검사 연동
 
+### 3. Rename
+- 선택 레이어 일괄 이름 변경
+- 자동 네이밍 (Content, Section, Item, Image, Text)
+
+### 4. Code2Design
+- React/HTML 코드를 Figma 디자인으로 변환
+- Typography Style Guide 자동 생성
+
+### 5. Checker
+- 디자인 시스템 컴포넌트 적용 여부 확인
+- 베리어블(변수) 적용 여부 확인
+- 텍스트 스타일 적용 여부 확인
+
+---
+
+## 설치 방법
+
+### 1. 플러그인 파일 다운로드
+
+**방법 A: ZIP 다운로드**
+1. 이 저장소 페이지에서 녹색 `Code` 버튼 클릭
+2. `Download ZIP` 선택
+3. 다운로드된 ZIP 파일 압축 해제
+
+**방법 B: Git Clone**
 ```bash
-npm install
-npm run build
+git clone https://github.com/design-neal/TPC-figma-plugin.git
 ```
 
-## Figma Access Token 발급
+### 2. Figma에서 플러그인 설치
 
-1. [Figma](https://www.figma.com)에 로그인
-2. 설정(Settings) > Personal access tokens
-3. "Generate new token" 클릭
-4. 토큰 이름 입력 후 생성
-5. 생성된 토큰 복사 (한 번만 표시됨)
+1. Figma Desktop 앱 실행
+2. 상단 메뉴에서 `Plugins` > `Development` > `Import plugin from manifest...` 클릭
+3. 다운로드한 폴더에서 `manifest.json` 파일 선택
+4. 플러그인이 `Development` 메뉴에 추가됨
 
-## Claude Desktop 설정
+### 3. 플러그인 실행
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 추가:
+- `Plugins` > `Development` > `Likey Assistant` 클릭
+- 또는 `Cmd/Ctrl + /` 눌러서 "Likey Assistant" 검색
 
-```json
-{
-  "mcpServers": {
-    "figma": {
-      "command": "node",
-      "args": ["/Users/tpc/Desktop/figma mcp/dist/index.js"],
-      "env": {
-        "FIGMA_ACCESS_TOKEN": "여기에_토큰_입력"
-      }
-    }
-  }
-}
+---
+
+## 파일 구조
+
 ```
-
-또는 tsx로 직접 실행:
-
-```json
-{
-  "mcpServers": {
-    "figma": {
-      "command": "npx",
-      "args": ["tsx", "/Users/tpc/Desktop/figma mcp/src/index.ts"],
-      "env": {
-        "FIGMA_ACCESS_TOKEN": "여기에_토큰_입력"
-      }
-    }
-  }
-}
-```
-
-## 사용 예시
-
-Claude에서 다음과 같이 사용할 수 있습니다:
-
-- "figma.com/file/ABC123/MyDesign 파일 정보 보여줘"
-- "이 Figma 파일의 스타일 목록 알려줘"
-- "노드 123:456을 PNG로 내보내줘"
-- "이 파일에 달린 코멘트들 보여줘"
-
-## 개발
-
-```bash
-# 개발 모드 실행
-FIGMA_ACCESS_TOKEN=xxx npm run dev
-
-# 빌드
-npm run build
-
-# 프로덕션 실행
-FIGMA_ACCESS_TOKEN=xxx npm start
+plugin/
+├── manifest.json    # 플러그인 설정 파일
+├── code.js          # 플러그인 백엔드 로직
+├── ui.html          # 플러그인 UI
+└── README.md        # 이 문서
 ```
 
 ---
 
-# Figma Plugin: Claude Design Assistant
+## 업데이트 방법
 
-자연어 명령으로 Figma 디자인을 수정할 수 있는 플러그인입니다.
+```bash
+cd TPC-figma-plugin
+git pull origin main
+```
 
-## 플러그인 설치 방법
+Figma를 재시작하면 변경사항이 자동으로 적용됩니다.
 
-1. Figma 데스크톱 앱 실행
-2. 아무 파일이나 열기
-3. 메뉴: **Plugins > Development > Import plugin from manifest...**
-4. `/Users/tpc/Desktop/figma mcp/plugin/manifest.json` 선택
-5. 플러그인 설치 완료
+---
 
-## 플러그인 실행
+## 문의
 
-1. Figma에서 **Plugins > Development > Claude Design Assistant** 클릭
-2. 수정할 레이어 선택
-3. 명령어 입력 후 "실행" 클릭
-
-## 지원하는 명령어
-
-| 명령어 예시 | 기능 |
-|------------|------|
-| 텍스트를 '새 텍스트'로 변경해줘 | 텍스트 내용 변경 |
-| 배경색을 #FF5733으로 변경해줘 | 색상 변경 |
-| 너비를 200으로 변경해줘 | 너비 변경 |
-| 높이를 100으로 변경해줘 | 높이 변경 |
-| 투명도를 50%로 변경해줘 | 투명도 조절 |
-| 이 레이어를 복제해줘 | 레이어 복제 |
-| 폰트 크기를 24로 변경해줘 | 폰트 크기 변경 |
-| 모서리를 10으로 변경해줘 | 모서리 둥글기 |
-| 이름을 '버튼'으로 변경해줘 | 레이어 이름 변경 |
-| 숨겨줘 / 보여줘 | 레이어 표시/숨김 |
-| 삭제해줘 | 레이어 삭제 |
-
-## 라이선스
-
-MIT
+문제가 있거나 기능 요청이 있으면 Issues에 등록해주세요.
