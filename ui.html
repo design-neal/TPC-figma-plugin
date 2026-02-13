@@ -707,6 +707,122 @@
       to { transform: rotate(360deg); }
     }
 
+    /* Code2Design 탭 스타일 */
+    .code-input-section {
+      margin-bottom: 16px;
+    }
+
+    .code-textarea {
+      width: 100%;
+      height: 200px;
+      padding: 12px;
+      border: 1px solid #D7D8E5;
+      border-radius: 12px;
+      font-size: 12px;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      resize: none;
+      background: #1E1E1E;
+      color: #D4D4D4;
+      line-height: 1.5;
+    }
+
+    .code-textarea:focus {
+      outline: none;
+      border-color: #6366F1;
+    }
+
+    .code-textarea::placeholder {
+      color: #6B6B6B;
+    }
+
+    .code-type-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .code-type-tab {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5A5A73;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .code-type-tab:hover {
+      border-color: #110F1A;
+    }
+
+    .code-type-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
+    .code-preview {
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .code-preview-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #5A5A73;
+      margin-bottom: 8px;
+    }
+
+    .code-preview-info {
+      font-size: 13px;
+      color: #110F1A;
+    }
+
+    /* 버튼 로딩 스타일 */
+    .btn-loading {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: btn-spin 0.8s linear infinite;
+    }
+
+    @keyframes btn-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .btn.loading {
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .btn.loading .btn-text {
+      display: none !important;
+    }
+
+    .btn.loading .btn-loading {
+      display: flex !important;
+    }
+
     /* Compare 탭 스타일 */
     .compare-input-section {
       margin-bottom: 16px;
@@ -910,7 +1026,7 @@
       <button class="tab active" data-tab="export">Data Fill</button>
       <button class="tab" data-tab="bridge">Text Editor</button>
       <button class="tab" data-tab="rename">Rename</button>
-      <button class="tab" data-tab="compare">Compare</button>
+      <button class="tab" data-tab="code2design">Code2Design</button>
       <button class="tab" data-tab="style">Checker</button>
     </div>
   </div>
@@ -1056,67 +1172,52 @@
     </div>
   </div>
 
-  <!-- Compare 탭 -->
-  <div class="tab-content" id="compare-tab">
+  <!-- Code2Design 탭 -->
+  <div class="tab-content" id="code2design-tab">
     <div class="main-content">
       <div class="card">
-        <h2 class="card-title">Notion ↔ Figma 비교</h2>
+        <h2 class="card-title">Code → Figma Design</h2>
 
-        <div class="compare-source-tabs">
-          <button class="compare-source-tab active" data-source="paste">
-            📋 직접 입력
+        <div class="code-type-tabs">
+          <button class="code-type-tab active" data-codetype="react" onclick="selectCodeType(this, 'react')">
+            ⚛️ React
           </button>
-          <button class="compare-source-tab" data-source="notion">
-            📝 Notion 연동
+          <button class="code-type-tab" data-codetype="html" onclick="selectCodeType(this, 'html')">
+            🌐 HTML/CSS
           </button>
         </div>
 
-        <div class="compare-input-section" id="pasteInputSection">
-          <label class="input-label">노션 기획 내용을 붙여넣으세요</label>
-          <textarea class="compare-textarea" id="notionContent" placeholder="예시:
-- 화면 제목: 프로필 설정
-- 버튼: 저장하기, 취소
-- 입력 필드: 닉네임, 이메일, 전화번호
-- 안내 문구: 프로필 정보를 입력해주세요"></textarea>
+        <div class="code-input-section">
+          <label class="input-label">React/HTML 코드를 붙여넣으세요</label>
+          <textarea class="code-textarea" id="codeInput" placeholder="// React 컴포넌트 또는 HTML 코드를 붙여넣으세요
+// CSS 스타일도 함께 붙여넣으면 자동으로 파싱됩니다
+
+export default function Component() {
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>Hello World</h1>
+    </div>
+  );
+}"></textarea>
         </div>
 
-        <div class="compare-input-section" id="notionUrlSection" style="display: none;">
-          <label class="input-label">Notion 페이지 ID</label>
-          <input type="text" class="notion-url-input" id="notionPageId" placeholder="예: 1234567890abcdef">
-          <div style="font-size: 11px; color: #838499;">
-            Notion 페이지 URL에서 마지막 부분의 ID를 입력하세요
-          </div>
+        <div class="button-group">
+          <button class="btn btn-primary" id="generateDesignBtn" onclick="generateDesign()">
+            <span class="btn-text">🎨 Figma 디자인 생성</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              생성 중...
+            </span>
+          </button>
         </div>
 
-        <div class="button-group" style="margin-bottom: 16px;">
-          <button class="btn btn-primary" id="compareBtn">🔍 비교 시작</button>
-        </div>
-
-        <div class="compare-summary-bar" id="compareSummary" style="display: none;">
-          <div class="compare-stat">
-            <div class="compare-stat-dot match"></div>
-            <span id="matchCount">0</span> 일치
-          </div>
-          <div class="compare-stat">
-            <div class="compare-stat-dot mismatch"></div>
-            <span id="mismatchCount">0</span> 불일치
-          </div>
-          <div class="compare-stat">
-            <div class="compare-stat-dot missing"></div>
-            <span id="missingCount">0</span> 누락
-          </div>
-        </div>
-
-        <div class="compare-results" id="compareResults">
-          <div class="checker-empty">
-            <div class="checker-empty-icon">📊</div>
-            <div class="checker-empty-text">비교할 내용을 입력하세요</div>
-            <div class="checker-empty-subtext">노션 기획 내용과 Figma 디자인의 텍스트를 비교합니다</div>
-          </div>
+        <div class="code-preview" id="codePreview" style="display: none;">
+          <div class="code-preview-title">파싱 결과</div>
+          <div class="code-preview-info" id="codePreviewInfo"></div>
         </div>
       </div>
 
-      <div class="status" id="compareStatus"></div>
+      <div class="status" id="code2designStatus"></div>
     </div>
   </div>
 
@@ -1174,6 +1275,9 @@
   </div><!-- content-wrapper 닫기 -->
 
   <script>
+    // ===== 전역 변수 =====
+    let currentCodeType = 'react';  // Code2Design 탭용
+
     // ===== 탭 드래그 스크롤 =====
     const tabsScroller = document.getElementById('tabsScroller');
     let isTabDragging = false;
@@ -1296,8 +1400,18 @@
     let selectionCount = 0;  // 현재 Figma에서 선택된 레이어 개수
     let matchingLayerCount = 0;  // 선택된 필드명과 일치하는 레이어 개수
 
+    // Code2Design 상태 표시 함수 (메시지 핸들러보다 먼저 정의)
+    function showCode2DesignStatus(message, type) {
+      const statusEl = document.getElementById('code2designStatus');
+      if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.className = 'status show ' + type;
+      }
+    }
+
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
+      if (!msg) return;  // 메시지가 없으면 무시
 
       if (msg.type === 'status') showBridgeStatus(msg.message, msg.status);
       if (msg.type === 'rename-status') showRenameStatus(msg.message, msg.status);
@@ -1338,6 +1452,16 @@
       }
 
       if (msg.type === 'check-spelling') checkSpelling(msg.texts);
+
+      // Code2Design 관련 메시지
+      if (msg.type === 'code2design-status') {
+        showCode2DesignStatus(msg.message, msg.status);
+        // 성공 또는 에러 시 로딩 해제
+        if (msg.status === 'success' || msg.status === 'error') {
+          const btn = document.getElementById('generateDesignBtn');
+          if (btn) btn.classList.remove('loading');
+        }
+      }
 
       // Checker 관련 메시지
       if (msg.type === 'checker-status') showCheckerStatus(msg.message, msg.status);
@@ -1801,6 +1925,143 @@
           }
         };
       });
+    }
+
+    // ===== Code2Design 탭 =====
+    const codeInput = document.getElementById('codeInput');
+    const codePreview = document.getElementById('codePreview');
+    const codePreviewInfo = document.getElementById('codePreviewInfo');
+
+    // 코드 타입 선택 함수 (인라인 onclick에서 호출)
+    function selectCodeType(btn, codeType) {
+      document.querySelectorAll('.code-type-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      currentCodeType = codeType;
+      console.log('코드 타입 변경:', currentCodeType);
+    }
+
+    // React 코드 파싱
+    function parseReactCode(code) {
+      const elements = [];
+
+      // CSS 스타일 추출 (/* CSS */ 또는 .css 파일 내용)
+      const cssStyles = {};
+      const cssRegex = /\.([a-zA-Z0-9_-]+)\s*\{([^}]+)\}/g;
+      let cssMatch;
+      while ((cssMatch = cssRegex.exec(code)) !== null) {
+        const className = cssMatch[1];
+        const styles = cssMatch[2];
+        cssStyles[className] = parseInlineStyles(styles);
+      }
+
+      // JSX 요소 파싱
+      const jsxRegex = /<(\w+)([^>]*)>([^<]*)<\/\1>|<(\w+)([^>]*)\/>/g;
+      let match;
+
+      // 인라인 스타일 객체 파싱
+      const styleObjectRegex = /style=\{\{([^}]+)\}\}/g;
+      const classNameRegex = /className="([^"]+)"/;
+
+      // rows 배열 데이터 추출 (TextStyleGuide 같은 컴포넌트용)
+      const rowsMatch = code.match(/const rows[^=]*=\s*\[([\s\S]*?)\];/);
+      if (rowsMatch) {
+        const rowsContent = rowsMatch[1];
+        const rowRegex = /\{[^{]*style:\s*"([^"]+)"[^{]*sample:\s*"([^"]+)"[^{]*spec:\s*"([^"]+)"[^{]*sampleStyle:\s*\{([^}]+)\}[^}]*\}/g;
+        let rowMatch;
+        while ((rowMatch = rowRegex.exec(rowsContent)) !== null) {
+          elements.push({
+            type: 'text-row',
+            styleName: rowMatch[1],
+            sample: rowMatch[2],
+            spec: rowMatch[3],
+            sampleStyle: parseInlineStyles(rowMatch[4])
+          });
+        }
+      }
+
+      // 헤더 추출
+      const headerH1 = code.match(/<h1[^>]*>([^<]+)<\/h1>/);
+      const headerP = code.match(/<p[^>]*>([^<]+)<\/p>/);
+      if (headerH1) {
+        elements.push({ type: 'header', title: headerH1[1], subtitle: headerP ? headerP[1] : '' });
+      }
+
+      return { elements, cssStyles };
+    }
+
+    // 인라인 스타일 파싱
+    function parseInlineStyles(styleStr) {
+      const styles = {};
+      const pairs = styleStr.split(/,\s*(?![^(]*\))/);
+
+      pairs.forEach(pair => {
+        const colonIndex = pair.indexOf(':');
+        if (colonIndex > -1) {
+          let key = pair.substring(0, colonIndex).trim();
+          let value = pair.substring(colonIndex + 1).trim();
+
+          // camelCase를 kebab-case로 변환
+          key = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+
+          // 따옴표 제거
+          value = value.replace(/['"]/g, '');
+
+          styles[key] = value;
+        }
+      });
+
+      return styles;
+    }
+
+    // 디자인 생성 함수 (전역)
+    function generateDesign() {
+      console.log('generateDesign 호출됨');
+
+      const btn = document.getElementById('generateDesignBtn');
+      const codeEl = document.getElementById('codeInput');
+      const code = codeEl ? codeEl.value.trim() : '';
+
+      if (!code) {
+        showCode2DesignStatus('코드를 입력해주세요', 'error');
+        return;
+      }
+
+      // 로딩 시작
+      console.log('로딩 시작');
+      if (btn) btn.classList.add('loading');
+      showCode2DesignStatus('코드 분석 중...', 'info');
+
+      try {
+        const parsed = parseReactCode(code);
+        console.log('파싱 완료:', parsed);
+
+        // 미리보기 표시
+        const preview = document.getElementById('codePreview');
+        const previewInfo = document.getElementById('codePreviewInfo');
+        if (preview) preview.style.display = 'block';
+        if (previewInfo) {
+          previewInfo.innerHTML = `
+            <div>발견된 요소: ${parsed.elements.length}개</div>
+            <div>CSS 클래스: ${Object.keys(parsed.cssStyles).length}개</div>
+          `;
+        }
+
+        // Figma에 디자인 생성 요청
+        console.log('Figma에 메시지 전송');
+        parent.postMessage({
+          pluginMessage: {
+            type: 'generate-from-code',
+            codeType: currentCodeType,
+            parsed: parsed,
+            rawCode: code
+          }
+        }, '*');
+
+      } catch (e) {
+        console.error('파싱 에러:', e);
+        if (btn) btn.classList.remove('loading');
+        showCode2DesignStatus('코드 파싱 실패: ' + e.message, 'error');
+      }
     }
 
     // ===== Checker 탭 =====

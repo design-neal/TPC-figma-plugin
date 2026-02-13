@@ -159,6 +159,11 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'compare-with-notion') {
     compareWithNotion(msg.notionText);
   }
+
+  // 코드에서 디자인 생성
+  if (msg.type === 'generate-from-code') {
+    await generateDesignFromCode(msg.codeType, msg.parsed, msg.rawCode);
+  }
 };
 
 // 선택된 레이어 정보 가져오기
@@ -1786,6 +1791,321 @@ function calculateSimilarity(str1, str2) {
   const union = new Set([...set1, ...set2]);
 
   return intersection.size / union.size;
+}
+
+// ===== Code2Design 기능 =====
+
+// 코드에서 Figma 디자인 생성
+async function generateDesignFromCode(codeType, parsed, rawCode) {
+  console.log('generateDesignFromCode 호출됨');
+  console.log('codeType:', codeType);
+  console.log('rawCode 길이:', rawCode ? rawCode.length : 0);
+
+  try {
+    figma.ui.postMessage({
+      type: 'code2design-status',
+      status: 'info',
+      message: '디자인 생성 중...'
+    });
+
+    // TextStyleGuide 같은 특수 컴포넌트 감지
+    if (rawCode && (rawCode.includes('TextStyleGuide') || rawCode.includes('tsg-root'))) {
+      console.log('TextStyleGuide 감지됨, 생성 시작');
+      await createTextStyleGuide(parsed, rawCode);
+      return;
+    }
+
+    // 일반 코드 파싱하여 디자인 생성
+    console.log('일반 디자인 생성 시작');
+    await createGenericDesign(parsed, rawCode);
+
+  } catch (e) {
+    console.error('디자인 생성 에러:', e);
+    figma.ui.postMessage({
+      type: 'code2design-status',
+      status: 'error',
+      message: '디자인 생성 실패: ' + e.message
+    });
+  }
+}
+
+// TextStyleGuide 컴포넌트 생성
+async function createTextStyleGuide(parsed, rawCode) {
+  console.log('createTextStyleGuide 시작');
+
+  try {
+    // 폰트 로드
+    console.log('폰트 로딩 중...');
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    await figma.loadFontAsync({ family: "Inter", style: "Medium" });
+    await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    console.log('폰트 로딩 완료');
+
+  // 메인 프레임 생성
+  const mainFrame = figma.createFrame();
+  mainFrame.name = "Typography / Text Style Guide";
+  mainFrame.resize(1280, 800);
+  mainFrame.fills = [{ type: 'SOLID', color: hexToRgb('#f6f6f3') }];
+  mainFrame.cornerRadius = 0;
+  mainFrame.layoutMode = 'VERTICAL';
+  mainFrame.paddingTop = 32;
+  mainFrame.paddingBottom = 32;
+  mainFrame.paddingLeft = 32;
+  mainFrame.paddingRight = 32;
+  mainFrame.itemSpacing = 20;
+  mainFrame.primaryAxisSizingMode = 'AUTO';
+
+  // 헤더 섹션
+  const header = figma.createFrame();
+  header.name = "Header";
+  header.layoutMode = 'VERTICAL';
+  header.itemSpacing = 8;
+  header.fills = [];
+
+  const title = figma.createText();
+  title.characters = "Typography / Text Style Guide";
+  title.fontSize = 40;
+  title.fontName = { family: "Inter", style: "Bold" };
+  title.fills = [{ type: 'SOLID', color: hexToRgb('#1d1f1a') }];
+  header.appendChild(title);
+
+  const subtitle = figma.createText();
+  subtitle.characters = "브랜드 전반에서 일관된 가독성과 계층을 위한 텍스트 시스템";
+  subtitle.fontSize = 16;
+  subtitle.fontName = { family: "Inter", style: "Regular" };
+  subtitle.fills = [{ type: 'SOLID', color: hexToRgb('#5c6254') }];
+  header.appendChild(subtitle);
+
+  mainFrame.appendChild(header);
+  // FILL/HUG는 부모에 추가된 후 설정
+  header.layoutSizingHorizontal = 'FILL';
+  header.layoutSizingVertical = 'HUG';
+
+  // 컬럼 헤더
+  const colHeader = figma.createFrame();
+  colHeader.name = "Column Header";
+  colHeader.layoutMode = 'HORIZONTAL';
+  colHeader.itemSpacing = 12;
+  colHeader.fills = [{ type: 'SOLID', color: hexToRgb('#ecede6') }];
+  colHeader.strokes = [{ type: 'SOLID', color: hexToRgb('#d9dbd1') }];
+  colHeader.strokeWeight = 1;
+  colHeader.cornerRadius = 10;
+  colHeader.paddingTop = 10;
+  colHeader.paddingBottom = 10;
+  colHeader.paddingLeft = 14;
+  colHeader.paddingRight = 14;
+
+  const col1Header = figma.createText();
+  col1Header.characters = "Style";
+  col1Header.fontSize = 13;
+  col1Header.fontName = { family: "Inter", style: "Semi Bold" };
+  col1Header.fills = [{ type: 'SOLID', color: hexToRgb('#394031') }];
+  col1Header.resize(220, col1Header.height);
+  colHeader.appendChild(col1Header);
+
+  const col2Header = figma.createText();
+  col2Header.characters = "Sample";
+  col2Header.fontSize = 13;
+  col2Header.fontName = { family: "Inter", style: "Semi Bold" };
+  col2Header.fills = [{ type: 'SOLID', color: hexToRgb('#394031') }];
+  col2Header.layoutGrow = 1;
+  colHeader.appendChild(col2Header);
+
+  const col3Header = figma.createText();
+  col3Header.characters = "Spec";
+  col3Header.fontSize = 13;
+  col3Header.fontName = { family: "Inter", style: "Semi Bold" };
+  col3Header.fills = [{ type: 'SOLID', color: hexToRgb('#394031') }];
+  col3Header.textAlignHorizontal = 'RIGHT';
+  col3Header.resize(280, col3Header.height);
+  colHeader.appendChild(col3Header);
+
+  mainFrame.appendChild(colHeader);
+  // FILL/HUG는 부모에 추가된 후 설정
+  colHeader.layoutSizingHorizontal = 'FILL';
+  colHeader.layoutSizingVertical = 'HUG';
+
+  // 행 데이터
+  const rows = [
+    { style: "Display", sample: "Build with Clarity", spec: "56 / 700 / 105%", fontSize: 56, fontWeight: "Bold", color: "#11130F" },
+    { style: "Heading 1", sample: "Product Principles", spec: "40 / 700 / 110%", fontSize: 40, fontWeight: "Bold", color: "#151713" },
+    { style: "Heading 2", sample: "Section Overview", spec: "32 / 600 / 115%", fontSize: 32, fontWeight: "Semi Bold", color: "#1A1D18" },
+    { style: "Heading 3", sample: "Card Title", spec: "24 / 600 / 120%", fontSize: 24, fontWeight: "Semi Bold", color: "#20241D" },
+    { style: "Title", sample: "Feature Overview", spec: "20 / 600 / 125%", fontSize: 20, fontWeight: "Semi Bold", color: "#20241D" },
+    { style: "Body / Large", sample: "Readable paragraph for key explanations and section intro.", spec: "18 / 500 / 150%", fontSize: 18, fontWeight: "Medium", color: "#2A3023" },
+    { style: "Body / Default", sample: "Default content text used in most product surfaces.", spec: "16 / 400 / 160%", fontSize: 16, fontWeight: "Regular", color: "#2E3428" },
+    { style: "Caption", sample: "Helper text, metadata, and supportive hints.", spec: "14 / 400 / 150%", fontSize: 14, fontWeight: "Regular", color: "#4F5645" },
+    { style: "Overline", sample: "SYSTEM LABEL", spec: "12 / 600 / 130%", fontSize: 12, fontWeight: "Semi Bold", color: "#4B5340" },
+  ];
+
+  // 행들을 담을 컨테이너
+  const rowsContainer = figma.createFrame();
+  rowsContainer.name = "Rows";
+  rowsContainer.layoutMode = 'VERTICAL';
+  rowsContainer.itemSpacing = 10;
+  rowsContainer.fills = [];
+
+  for (const rowData of rows) {
+    const row = figma.createFrame();
+    row.name = rowData.style;
+    row.layoutMode = 'HORIZONTAL';
+    row.itemSpacing = 12;
+    row.fills = [{ type: 'SOLID', color: hexToRgb('#ffffff') }];
+    row.strokes = [{ type: 'SOLID', color: hexToRgb('#e4e6dd') }];
+    row.strokeWeight = 1;
+    row.cornerRadius = 10;
+    row.paddingTop = 14;
+    row.paddingBottom = 14;
+    row.paddingLeft = 14;
+    row.paddingRight = 14;
+    row.counterAxisAlignItems = 'CENTER';
+
+    // Style 이름
+    const styleLabel = figma.createText();
+    styleLabel.characters = rowData.style;
+    styleLabel.fontSize = 14;
+    styleLabel.fontName = { family: "Inter", style: "Semi Bold" };
+    styleLabel.fills = [{ type: 'SOLID', color: hexToRgb('#2a3023') }];
+    styleLabel.resize(220, styleLabel.height);
+    row.appendChild(styleLabel);
+
+    // Sample 텍스트
+    const sampleText = figma.createText();
+    sampleText.characters = rowData.sample;
+    sampleText.fontSize = rowData.fontSize;
+    sampleText.fontName = { family: "Inter", style: rowData.fontWeight };
+    sampleText.fills = [{ type: 'SOLID', color: hexToRgb(rowData.color) }];
+    sampleText.layoutGrow = 1;
+    row.appendChild(sampleText);
+
+    // Spec
+    const specText = figma.createText();
+    specText.characters = rowData.spec;
+    specText.fontSize = 13;
+    specText.fontName = { family: "Inter", style: "Medium" };
+    specText.fills = [{ type: 'SOLID', color: hexToRgb('#58614d') }];
+    specText.textAlignHorizontal = 'RIGHT';
+    specText.resize(280, specText.height);
+    row.appendChild(specText);
+
+    rowsContainer.appendChild(row);
+    // FILL/HUG는 부모에 추가된 후 설정
+    row.layoutSizingHorizontal = 'FILL';
+    row.layoutSizingVertical = 'HUG';
+  }
+
+  mainFrame.appendChild(rowsContainer);
+  // FILL/HUG는 부모에 추가된 후 설정
+  rowsContainer.layoutSizingHorizontal = 'FILL';
+  rowsContainer.layoutSizingVertical = 'HUG';
+
+  // 노트 섹션
+  const note = figma.createFrame();
+  note.name = "Note";
+  note.layoutMode = 'VERTICAL';
+  note.itemSpacing = 6;
+  note.fills = [{ type: 'SOLID', color: hexToRgb('#ecede6') }];
+  note.strokes = [{ type: 'SOLID', color: hexToRgb('#d9dbd1') }];
+  note.strokeWeight = 1;
+  note.cornerRadius = 10;
+  note.paddingTop = 14;
+  note.paddingBottom = 14;
+  note.paddingLeft = 16;
+  note.paddingRight = 16;
+
+  const noteTitle = figma.createText();
+  noteTitle.characters = "Usage Rule";
+  noteTitle.fontSize = 13;
+  noteTitle.fontName = { family: "Inter", style: "Semi Bold" };
+  noteTitle.fills = [{ type: 'SOLID', color: hexToRgb('#2a3023') }];
+  note.appendChild(noteTitle);
+
+  const noteDesc = figma.createText();
+  noteDesc.characters = "Line-height is locked to each tier to keep rhythm consistent across cards, tables, and forms.";
+  noteDesc.fontSize = 13;
+  noteDesc.fontName = { family: "Inter", style: "Regular" };
+  noteDesc.fills = [{ type: 'SOLID', color: hexToRgb('#58614d') }];
+  note.appendChild(noteDesc);
+
+  mainFrame.appendChild(note);
+  // FILL/HUG는 부모에 추가된 후 설정
+  note.layoutSizingHorizontal = 'FILL';
+  note.layoutSizingVertical = 'HUG';
+
+    // 현재 페이지에 추가
+    console.log('페이지에 프레임 추가 중...');
+    figma.currentPage.appendChild(mainFrame);
+
+    // 뷰포트 이동
+    figma.viewport.scrollAndZoomIntoView([mainFrame]);
+
+    // 선택
+    figma.currentPage.selection = [mainFrame];
+
+    console.log('TextStyleGuide 생성 완료!');
+    figma.ui.postMessage({
+      type: 'code2design-status',
+      status: 'success',
+      message: 'TextStyleGuide 디자인이 생성되었습니다!'
+    });
+
+  } catch (e) {
+    console.error('createTextStyleGuide 에러:', e);
+    figma.ui.postMessage({
+      type: 'code2design-status',
+      status: 'error',
+      message: '생성 실패: ' + e.message
+    });
+  }
+}
+
+// 일반 디자인 생성
+async function createGenericDesign(parsed, rawCode) {
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+
+  const mainFrame = figma.createFrame();
+  mainFrame.name = "Generated Design";
+  mainFrame.resize(800, 600);
+  mainFrame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  mainFrame.layoutMode = 'VERTICAL';
+  mainFrame.paddingTop = 24;
+  mainFrame.paddingBottom = 24;
+  mainFrame.paddingLeft = 24;
+  mainFrame.paddingRight = 24;
+  mainFrame.itemSpacing = 16;
+
+  // 헤더가 있으면 추가
+  if (parsed.elements.length > 0) {
+    const header = parsed.elements.find(e => e.type === 'header');
+    if (header) {
+      const titleText = figma.createText();
+      titleText.characters = header.title || "Generated Design";
+      titleText.fontSize = 32;
+      titleText.fontName = { family: "Inter", style: "Bold" };
+      mainFrame.appendChild(titleText);
+
+      if (header.subtitle) {
+        const subtitleText = figma.createText();
+        subtitleText.characters = header.subtitle;
+        subtitleText.fontSize = 16;
+        subtitleText.fontName = { family: "Inter", style: "Regular" };
+        subtitleText.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.4 } }];
+        mainFrame.appendChild(subtitleText);
+      }
+    }
+  }
+
+  figma.currentPage.appendChild(mainFrame);
+  figma.viewport.scrollAndZoomIntoView([mainFrame]);
+  figma.currentPage.selection = [mainFrame];
+
+  figma.ui.postMessage({
+    type: 'code2design-status',
+    status: 'success',
+    message: '디자인이 생성되었습니다!'
+  });
 }
 
 // 텍스트 스타일 체크 - 텍스트 스타일이 적용되지 않은 텍스트 레이어 찾기
