@@ -1449,6 +1449,7 @@ export default function Component() {
   <script>
     // ===== 전역 변수 =====
     let currentCodeType = 'react';  // Code2Design 탭용
+    let currentVariableType = 'auto';  // Variables 탭용
 
     // ===== 탭 드래그 스크롤 =====
     const tabsScroller = document.getElementById('tabsScroller');
@@ -2247,8 +2248,6 @@ export default function Component() {
     }
 
     // ===== Variables 탭 =====
-    let currentVariableType = 'auto';
-
     function selectVariableType(btn, type) {
       document.querySelectorAll('.variable-type-tab').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
