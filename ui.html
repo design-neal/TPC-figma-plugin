@@ -767,6 +767,95 @@
       color: #fff;
     }
 
+    /* Variables 탭 스타일 */
+    .variable-type-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .variable-type-tab {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: 10px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      color: #5A5A73;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .variable-type-tab:hover {
+      border-color: #110F1A;
+    }
+
+    .variable-type-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
+    .variable-preview-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #E5E7EB;
+      gap: 10px;
+    }
+
+    .variable-preview-item:last-child {
+      border-bottom: none;
+    }
+
+    .variable-color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid #D7D8E5;
+      flex-shrink: 0;
+    }
+
+    .variable-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 500;
+      color: #374151;
+      font-family: monospace;
+    }
+
+    .variable-value {
+      font-size: 12px;
+      color: #6B7280;
+      font-family: monospace;
+    }
+
+    .variable-type-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .variable-type-badge.color {
+      background: #DBEAFE;
+      color: #1D4ED8;
+    }
+
+    .variable-type-badge.number {
+      background: #D1FAE5;
+      color: #047857;
+    }
+
+    .variable-type-badge.string {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
     .code-preview {
       background: #F9FAFB;
       border: 1px solid #E5E7EB;
@@ -1027,6 +1116,7 @@
       <button class="tab" data-tab="bridge">Text Editor</button>
       <button class="tab" data-tab="rename">Rename</button>
       <button class="tab" data-tab="code2design">Code2Design</button>
+      <button class="tab" data-tab="variables">Variables</button>
       <button class="tab" data-tab="style">Checker</button>
     </div>
   </div>
@@ -1218,6 +1308,88 @@ export default function Component() {
       </div>
 
       <div class="status" id="code2designStatus"></div>
+    </div>
+  </div>
+
+  <!-- Variables 탭 -->
+  <div class="tab-content" id="variables-tab">
+    <div class="main-content">
+      <div class="card">
+        <h2 class="card-title">🎨 Design Token → Variables</h2>
+        <p class="card-desc" style="color: #838499; font-size: 13px; margin-bottom: 16px;">
+          JSON 형식의 디자인 토큰을 Figma 베리어블로 변환합니다
+        </p>
+
+        <div class="variable-type-tabs">
+          <button class="variable-type-tab active" data-vartype="color" onclick="selectVariableType(this, 'color')">
+            🎨 Color
+          </button>
+          <button class="variable-type-tab" data-vartype="number" onclick="selectVariableType(this, 'number')">
+            📏 Number
+          </button>
+          <button class="variable-type-tab" data-vartype="string" onclick="selectVariableType(this, 'string')">
+            📝 String
+          </button>
+          <button class="variable-type-tab" data-vartype="auto" onclick="selectVariableType(this, 'auto')">
+            🔄 Auto
+          </button>
+        </div>
+
+        <div class="code-input-section">
+          <label class="input-label">Collection 이름</label>
+          <input type="text" class="input-text" id="collectionName" placeholder="Design Tokens" value="Design Tokens" style="margin-bottom: 12px;">
+
+          <label class="input-label">JSON 토큰 입력</label>
+          <textarea class="code-textarea" id="variableJsonInput" placeholder='{
+  "color/primary/500": "#3B82F6",
+  "color/primary/600": "#2563EB",
+  "color/neutral/100": "#F3F4F6",
+  "spacing/xs": 4,
+  "spacing/sm": 8,
+  "spacing/md": 16,
+  "spacing/lg": 24,
+  "radius/sm": 4,
+  "radius/md": 8,
+  "radius/lg": 12,
+  "font/family/primary": "Inter"
+}'></textarea>
+        </div>
+
+        <div class="variable-preview" id="variablePreview" style="display: none; margin-top: 16px;">
+          <div class="variable-preview-title" style="font-weight: 600; margin-bottom: 8px;">📋 미리보기</div>
+          <div class="variable-preview-list" id="variablePreviewList" style="max-height: 200px; overflow-y: auto; background: #F9FAFB; border-radius: 8px; padding: 12px;"></div>
+        </div>
+
+        <div class="button-group" style="margin-top: 16px;">
+          <button class="btn btn-secondary" onclick="previewVariables()">
+            👁️ 미리보기
+          </button>
+          <button class="btn btn-primary" id="createVariablesBtn" onclick="createVariables()">
+            <span class="btn-text">✨ 베리어블 생성</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              생성 중...
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <h3 class="card-title" style="font-size: 16px;">💡 사용 예시</h3>
+        <div class="example-tokens" style="background: #F9FAFB; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 12px; color: #374151; white-space: pre-wrap;">{
+  "color/primary/500": "#3B82F6",
+  "spacing/md": 16,
+  "radius/lg": 12,
+  "font/family": "Inter"
+}</div>
+        <p style="color: #838499; font-size: 12px; margin-top: 8px;">
+          • Color: #HEX, rgb(), rgba() 형식<br>
+          • Number: spacing, radius, size 등<br>
+          • String: font family, 텍스트 등
+        </p>
+      </div>
+
+      <div class="status" id="variablesStatus"></div>
     </div>
   </div>
 
@@ -1459,6 +1631,16 @@ export default function Component() {
         // 성공 또는 에러 시 로딩 해제
         if (msg.status === 'success' || msg.status === 'error') {
           const btn = document.getElementById('generateDesignBtn');
+          if (btn) btn.classList.remove('loading');
+        }
+      }
+
+      // Variables 관련 메시지
+      if (msg.type === 'variables-status') {
+        showVariablesStatus(msg.message, msg.status);
+        // 성공 또는 에러 시 로딩 해제
+        if (msg.status === 'success' || msg.status === 'error') {
+          const btn = document.getElementById('createVariablesBtn');
           if (btn) btn.classList.remove('loading');
         }
       }
@@ -2061,6 +2243,147 @@ export default function Component() {
         console.error('파싱 에러:', e);
         if (btn) btn.classList.remove('loading');
         showCode2DesignStatus('코드 파싱 실패: ' + e.message, 'error');
+      }
+    }
+
+    // ===== Variables 탭 =====
+    let currentVariableType = 'auto';
+
+    function selectVariableType(btn, type) {
+      document.querySelectorAll('.variable-type-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      currentVariableType = type;
+    }
+
+    function showVariablesStatus(message, type) {
+      const statusEl = document.getElementById('variablesStatus');
+      if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.className = 'status show ' + type;
+      }
+    }
+
+    function detectValueType(value) {
+      // 색상 감지
+      if (typeof value === 'string') {
+        // HEX 색상
+        if (/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3}|[A-Fa-f0-9]{8})$/.test(value)) {
+          return 'color';
+        }
+        // rgb/rgba
+        if (/^rgba?\s*\(/.test(value)) {
+          return 'color';
+        }
+        // hsl/hsla
+        if (/^hsla?\s*\(/.test(value)) {
+          return 'color';
+        }
+      }
+      // 숫자 감지
+      if (typeof value === 'number') {
+        return 'number';
+      }
+      if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) {
+        return 'number';
+      }
+      // 나머지는 문자열
+      return 'string';
+    }
+
+    function parseJsonTokens(jsonStr) {
+      try {
+        const data = JSON.parse(jsonStr);
+        const tokens = [];
+
+        for (const [name, value] of Object.entries(data)) {
+          let type = currentVariableType;
+          if (type === 'auto') {
+            type = detectValueType(value);
+          }
+          tokens.push({ name, value, type });
+        }
+
+        return tokens;
+      } catch (e) {
+        throw new Error('JSON 파싱 실패: ' + e.message);
+      }
+    }
+
+    function previewVariables() {
+      const jsonInput = document.getElementById('variableJsonInput');
+      const previewEl = document.getElementById('variablePreview');
+      const listEl = document.getElementById('variablePreviewList');
+
+      if (!jsonInput || !jsonInput.value.trim()) {
+        showVariablesStatus('JSON을 입력해주세요', 'error');
+        return;
+      }
+
+      try {
+        const tokens = parseJsonTokens(jsonInput.value);
+
+        if (tokens.length === 0) {
+          showVariablesStatus('토큰이 없습니다', 'error');
+          return;
+        }
+
+        // 미리보기 표시
+        previewEl.style.display = 'block';
+        listEl.innerHTML = tokens.map(token => {
+          const colorSwatch = token.type === 'color'
+            ? `<div class="variable-color-swatch" style="background: ${token.value};"></div>`
+            : '';
+          return `
+            <div class="variable-preview-item">
+              ${colorSwatch}
+              <span class="variable-name">${token.name}</span>
+              <span class="variable-type-badge ${token.type}">${token.type}</span>
+              <span class="variable-value">${token.value}</span>
+            </div>
+          `;
+        }).join('');
+
+        showVariablesStatus(`${tokens.length}개 토큰 감지됨`, 'success');
+
+      } catch (e) {
+        showVariablesStatus(e.message, 'error');
+      }
+    }
+
+    function createVariables() {
+      const btn = document.getElementById('createVariablesBtn');
+      const jsonInput = document.getElementById('variableJsonInput');
+      const collectionName = document.getElementById('collectionName');
+
+      if (!jsonInput || !jsonInput.value.trim()) {
+        showVariablesStatus('JSON을 입력해주세요', 'error');
+        return;
+      }
+
+      try {
+        const tokens = parseJsonTokens(jsonInput.value);
+
+        if (tokens.length === 0) {
+          showVariablesStatus('토큰이 없습니다', 'error');
+          return;
+        }
+
+        // 로딩 시작
+        if (btn) btn.classList.add('loading');
+        showVariablesStatus('베리어블 생성 중...', 'info');
+
+        // Figma에 메시지 전송
+        parent.postMessage({
+          pluginMessage: {
+            type: 'create-variables',
+            collectionName: collectionName ? collectionName.value : 'Design Tokens',
+            tokens: tokens
+          }
+        }, '*');
+
+      } catch (e) {
+        if (btn) btn.classList.remove('loading');
+        showVariablesStatus(e.message, 'error');
       }
     }
 

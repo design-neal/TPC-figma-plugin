@@ -164,6 +164,11 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'generate-from-code') {
     await generateDesignFromCode(msg.codeType, msg.parsed, msg.rawCode);
   }
+
+  // 베리어블 생성
+  if (msg.type === 'create-variables') {
+    await createVariablesFromTokens(msg.collectionName, msg.tokens);
+  }
 };
 
 // 선택된 레이어 정보 가져오기
@@ -2182,4 +2187,156 @@ function checkTextStyles(selection) {
   }
 
   return results;
+}
+
+// ===== Variables 생성 기능 =====
+
+// HEX를 Figma RGB로 변환 (0-1 범위)
+function hexToFigmaRgb(hex) {
+  hex = hex.replace('#', '');
+
+  // 3자리 HEX를 6자리로 변환
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+
+  // 8자리 HEX (알파 포함)
+  let alpha = 1;
+  if (hex.length === 8) {
+    alpha = parseInt(hex.slice(6, 8), 16) / 255;
+    hex = hex.slice(0, 6);
+  }
+
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
+
+  return { r, g, b, a: alpha };
+}
+
+// RGB/RGBA 문자열 파싱
+function parseRgbString(str) {
+  const match = str.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/);
+  if (!match) return null;
+
+  return {
+    r: parseInt(match[1]) / 255,
+    g: parseInt(match[2]) / 255,
+    b: parseInt(match[3]) / 255,
+    a: match[4] ? parseFloat(match[4]) : 1
+  };
+}
+
+// 색상 값을 Figma 색상 객체로 변환
+function parseColorValue(value) {
+  if (typeof value === 'string') {
+    // HEX
+    if (value.startsWith('#')) {
+      return hexToFigmaRgb(value);
+    }
+    // RGB/RGBA
+    if (value.startsWith('rgb')) {
+      return parseRgbString(value);
+    }
+  }
+  return null;
+}
+
+// 토큰에서 Figma 베리어블 생성
+async function createVariablesFromTokens(collectionName, tokens) {
+  try {
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: 'info',
+      message: '베리어블 컬렉션 생성 중...'
+    });
+
+    // 기존 컬렉션 찾기 또는 새로 생성
+    let collection = figma.variables.getLocalVariableCollections()
+      .find(c => c.name === collectionName);
+
+    if (!collection) {
+      collection = figma.variables.createVariableCollection(collectionName);
+    }
+
+    // 기본 모드 ID 가져오기
+    const modeId = collection.modes[0].id;
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    const errors = [];
+
+    for (const token of tokens) {
+      try {
+        // 이미 존재하는 변수 확인
+        const existingVar = figma.variables.getLocalVariables()
+          .find(v => v.name === token.name && v.variableCollectionId === collection.id);
+
+        if (existingVar) {
+          skippedCount++;
+          continue;
+        }
+
+        let variable;
+        let value;
+
+        switch (token.type) {
+          case 'color':
+            const colorValue = parseColorValue(token.value);
+            if (!colorValue) {
+              errors.push(`색상 파싱 실패: ${token.name}`);
+              continue;
+            }
+            variable = figma.variables.createVariable(token.name, collection, 'COLOR');
+            value = { r: colorValue.r, g: colorValue.g, b: colorValue.b, a: colorValue.a };
+            break;
+
+          case 'number':
+            variable = figma.variables.createVariable(token.name, collection, 'FLOAT');
+            value = typeof token.value === 'string' ? parseFloat(token.value) : token.value;
+            break;
+
+          case 'string':
+            variable = figma.variables.createVariable(token.name, collection, 'STRING');
+            value = String(token.value);
+            break;
+
+          default:
+            errors.push(`알 수 없는 타입: ${token.type} (${token.name})`);
+            continue;
+        }
+
+        // 값 설정
+        variable.setValueForMode(modeId, value);
+        createdCount++;
+
+      } catch (e) {
+        errors.push(`${token.name}: ${e.message}`);
+      }
+    }
+
+    // 결과 메시지
+    let message = `✅ ${createdCount}개 베리어블 생성 완료!`;
+    if (skippedCount > 0) {
+      message += ` (${skippedCount}개 중복 스킵)`;
+    }
+    if (errors.length > 0) {
+      message += `\n⚠️ ${errors.length}개 에러 발생`;
+      console.log('Variable creation errors:', errors);
+    }
+
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: errors.length > 0 ? 'warning' : 'success',
+      message: message
+    });
+
+  } catch (e) {
+    console.error('베리어블 생성 에러:', e);
+    figma.ui.postMessage({
+      type: 'variables-status',
+      status: 'error',
+      message: '베리어블 생성 실패: ' + e.message
+    });
+  }
 }
