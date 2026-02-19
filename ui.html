@@ -1206,7 +1206,13 @@
           <textarea id="directText" placeholder="선택한 레이어의 텍스트를 이 내용으로 변경합니다"></textarea>
         </div>
         <div class="button-group">
-          <button class="btn btn-primary" id="directChangeBtn">선택 레이어 텍스트 변경</button>
+          <button class="btn btn-primary" id="directChangeBtn">
+            <span class="btn-text">선택 레이어 텍스트 변경</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              변경 중...
+            </span>
+          </button>
         </div>
       </div>
 
@@ -1218,8 +1224,20 @@
         </div>
 
         <div class="button-group horizontal">
-          <button class="btn btn-secondary" id="spellCheckBtn">맞춤법 검사</button>
-          <button class="btn btn-primary" id="executeBtn">텍스트 변경</button>
+          <button class="btn btn-secondary" id="spellCheckBtn">
+            <span class="btn-text">맞춤법 검사</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              검사 중...
+            </span>
+          </button>
+          <button class="btn btn-primary" id="executeBtn">
+            <span class="btn-text">텍스트 변경</span>
+            <span class="btn-loading">
+              <span class="btn-spinner"></span>
+              변경 중...
+            </span>
+          </button>
         </div>
 
         <div class="examples-section">
@@ -1565,29 +1583,35 @@ export default function Component() {
     }
 
     // 직접 텍스트 변경 버튼
-    document.getElementById('directChangeBtn').onclick = () => {
+    const directChangeBtn = document.getElementById('directChangeBtn');
+    directChangeBtn.onclick = () => {
       const newText = directTextInput.value;
       if (!newText) {
         showBridgeStatus('변경할 텍스트를 입력해주세요', 'error');
         return;
       }
+      directChangeBtn.classList.add('loading');
       showBridgeStatus('텍스트 변경 중...', 'info');
       parent.postMessage({
         pluginMessage: { type: 'direct-text-change', text: newText }
       }, '*');
     };
 
-    document.getElementById('executeBtn').onclick = () => {
+    const executeBtn = document.getElementById('executeBtn');
+    executeBtn.onclick = () => {
       const command = commandInput.value.trim();
       if (!command) {
         showBridgeStatus('명령어를 입력해주세요', 'error');
         return;
       }
+      executeBtn.classList.add('loading');
       showBridgeStatus('처리 중...', 'info');
       parent.postMessage({ pluginMessage: { type: 'execute-command', command } }, '*');
     };
 
-    document.getElementById('spellCheckBtn').onclick = () => {
+    const spellCheckBtn = document.getElementById('spellCheckBtn');
+    spellCheckBtn.onclick = () => {
+      spellCheckBtn.classList.add('loading');
       showBridgeStatus('맞춤법 검사 중...', 'info');
       spellResults.className = 'spell-results';
       spellResults.innerHTML = '';
@@ -1615,7 +1639,16 @@ export default function Component() {
       const msg = event.data.pluginMessage;
       if (!msg) return;  // 메시지가 없으면 무시
 
-      if (msg.type === 'status') showBridgeStatus(msg.message, msg.status);
+      if (msg.type === 'status') {
+        showBridgeStatus(msg.message, msg.status);
+        // 성공 또는 에러 시 로딩 해제
+        if (msg.status === 'success' || msg.status === 'error') {
+          const directBtn = document.getElementById('directChangeBtn');
+          const execBtn = document.getElementById('executeBtn');
+          if (directBtn) directBtn.classList.remove('loading');
+          if (execBtn) execBtn.classList.remove('loading');
+        }
+      }
       if (msg.type === 'rename-status') showRenameStatus(msg.message, msg.status);
       if (msg.type === 'data-fill-status') showDataFillStatus(msg.message, msg.status);
 
@@ -1629,6 +1662,9 @@ export default function Component() {
       if (msg.type === 'spell-results') {
         bridgeStatus.className = 'status';
         spellResults.className = 'spell-results show';
+        // 맞춤법 검사 로딩 해제
+        const spellBtn = document.getElementById('spellCheckBtn');
+        if (spellBtn) spellBtn.classList.remove('loading');
 
         if (msg.errors.length === 0) {
           spellResults.innerHTML = '<div class="spell-ok">맞춤법 오류가 없습니다!</div>';
