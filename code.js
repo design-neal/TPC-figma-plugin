@@ -2515,10 +2515,22 @@ async function convertPenFrames(penFrames, variables) {
     for (var fi = 0; fi < penFrames.length; fi++) {
       var penFrame = penFrames[fi];
       try {
+        // 진행 상황 실시간 전송
+        figma.ui.postMessage({
+          type: 'pen-convert-progress',
+          current: fi + 1,
+          total: penFrames.length,
+          name: penFrame.name || ('프레임 ' + (fi + 1))
+        });
+
         var figmaFrame = await convertPenNode(penFrame);
         if (figmaFrame) {
           figmaFrame.x = penFrame.x || 0;
           figmaFrame.y = penFrame.y || 0;
+          // height가 null인 최상위 프레임 → 자동 높이 (HUG)
+          if (figmaFrame.layoutMode !== 'NONE' && !(typeof penFrame.height === 'number' && penFrame.height > 0)) {
+            try { figmaFrame.layoutSizingVertical = 'HUG'; } catch(e) {}
+          }
           figma.currentPage.appendChild(figmaFrame);
           createdCount++;
         }
@@ -2594,9 +2606,9 @@ async function convertPenNode(penNode) {
     var frame = figma.createFrame();
     frame.name = penNode.name || 'Frame';
 
-    // 크기 (fill_container/hug_content는 일단 기본값, 나중에 부모가 sizing 설정)
-    var w = (typeof penNode.width === 'number') ? penNode.width : 100;
-    var h = (typeof penNode.height === 'number') ? penNode.height : 100;
+    // 크기: null/undefined/'hug_content'/'fill_container' 모두 안전하게 처리
+    var w = (typeof penNode.width === 'number' && penNode.width > 0) ? penNode.width : 100;
+    var h = (typeof penNode.height === 'number' && penNode.height > 0) ? penNode.height : 100;
     frame.resize(w, h);
 
     // 모서리 반경

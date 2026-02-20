@@ -895,6 +895,45 @@
       flex-shrink: 0;
     }
 
+    /* .pen 변환 진행 바 */
+    .pen-progress {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #F0F0F8;
+      border-radius: 10px;
+    }
+
+    .pen-progress-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #110F1A;
+      margin-bottom: 8px;
+    }
+
+    .pen-progress-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #D7D8E5;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .pen-progress-bar {
+      height: 100%;
+      background: #110F1A;
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    .pen-progress-name {
+      font-size: 11px;
+      color: #838499;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* Variables 탭 스타일 */
     .variable-type-tabs {
       display: flex;
@@ -1493,6 +1532,15 @@ export default function Component() {
           </button>
         </div>
 
+        <!-- 변환 진행 바 -->
+        <div class="pen-progress" id="penProgress" style="display:none;">
+          <div class="pen-progress-label" id="penProgressLabel">변환 중... (0/0)</div>
+          <div class="pen-progress-bar-wrap">
+            <div class="pen-progress-bar" id="penProgressBar" style="width:0%"></div>
+          </div>
+          <div class="pen-progress-name" id="penProgressName"></div>
+        </div>
+
         <div class="status" id="penConvertStatus"></div>
       </div>
     </div>
@@ -1870,8 +1918,33 @@ export default function Component() {
         }
       }
 
-      // .pen 변환 관련 메시지
+      // .pen 변환 진행 상황
+      if (msg.type === 'pen-convert-progress') {
+        const pct = Math.round((msg.current / msg.total) * 100);
+        const progressEl = document.getElementById('penProgress');
+        const labelEl = document.getElementById('penProgressLabel');
+        const barEl = document.getElementById('penProgressBar');
+        const nameEl = document.getElementById('penProgressName');
+        if (progressEl) progressEl.style.display = 'block';
+        if (labelEl) labelEl.textContent = '변환 중... (' + msg.current + '/' + msg.total + ')';
+        if (barEl) barEl.style.width = pct + '%';
+        if (nameEl) nameEl.textContent = msg.name;
+      }
+
+      // .pen 변환 완료/에러
       if (msg.type === 'pen-convert-status') {
+        const progressEl = document.getElementById('penProgress');
+        const barEl = document.getElementById('penProgressBar');
+        const labelEl = document.getElementById('penProgressLabel');
+        if (msg.status === 'success' || msg.status === 'warning') {
+          if (barEl) barEl.style.width = '100%';
+          if (labelEl) labelEl.textContent = '변환 완료!';
+          setTimeout(function() {
+            if (progressEl) progressEl.style.display = 'none';
+          }, 2000);
+        } else {
+          if (progressEl) progressEl.style.display = 'none';
+        }
         showPenStatus(msg.message, msg.status);
         const btn = document.getElementById('convertPenBtn');
         if (btn) btn.classList.remove('loading');
@@ -2522,40 +2595,48 @@ export default function Component() {
     });
 
     function loadPenFile(file) {
+      // 즉시 로딩 상태 표시
+      showPenStatus('파일 읽는 중...', 'info');
+      document.getElementById('penDropzone').style.display = 'none';
+
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = function(e) {
         try {
           penDocumentData = JSON.parse(e.target.result);
           displayPenFile(file.name, penDocumentData);
         } catch (err) {
+          document.getElementById('penDropzone').style.display = '';
           showPenStatus('.pen 파일 파싱 실패: ' + err.message, 'error');
         }
+      };
+      reader.onerror = function() {
+        document.getElementById('penDropzone').style.display = '';
+        showPenStatus('파일을 읽을 수 없습니다', 'error');
       };
       reader.readAsText(file);
     }
 
     function displayPenFile(fileName, doc) {
       // 최상위 children 중 frame 타입만 수집
-      const frames = (doc.children || []).filter(n => n.type === 'frame');
+      const frames = (doc.children || []).filter(function(n) { return n.type === 'frame'; });
 
       document.getElementById('penFileName').textContent = fileName;
-      document.getElementById('penFileMeta').textContent = `${frames.length}개 프레임`;
+      document.getElementById('penFileMeta').textContent = frames.length + '개 프레임 · ' + (doc.variables ? Object.keys(doc.variables).length : 0) + '개 변수';
       document.getElementById('penFileInfo').classList.add('show');
-      document.getElementById('penDropzone').style.display = 'none';
+      document.getElementById('penConvertStatus').className = 'status'; // 로딩 메시지 제거
 
       // 프레임 목록 렌더링
       const listEl = document.getElementById('penFrameList');
       listEl.innerHTML = '';
-      frames.forEach((frame, idx) => {
+      frames.forEach(function(frame, idx) {
         const w = Math.round(frame.width || 0);
-        const h = Math.round(frame.height || 0);
+        const h = frame.height ? Math.round(frame.height) + '' : 'auto';
         const item = document.createElement('div');
         item.className = 'pen-frame-item';
-        item.innerHTML = `
-          <input type="checkbox" id="penFrame_${idx}" checked data-idx="${idx}">
-          <label for="penFrame_${idx}" class="pen-frame-item-name">${frame.name || '프레임 ' + (idx+1)}</label>
-          <span class="pen-frame-item-size">${w}×${h}</span>
-        `;
+        item.innerHTML =
+          '<input type="checkbox" id="penFrame_' + idx + '" checked data-idx="' + idx + '">' +
+          '<label for="penFrame_' + idx + '" class="pen-frame-item-name">' + (frame.name || ('프레임 ' + (idx+1))) + '</label>' +
+          '<span class="pen-frame-item-size">' + w + '×' + h + '</span>';
         listEl.appendChild(item);
       });
 
@@ -2574,6 +2655,7 @@ export default function Component() {
       document.getElementById('penFrameList').classList.remove('show');
       document.getElementById('penDropzone').style.display = '';
       document.getElementById('convertPenBtn').style.display = 'none';
+      document.getElementById('penProgress').style.display = 'none';
       document.getElementById('penConvertStatus').className = 'status';
     }
 
@@ -2592,10 +2674,10 @@ export default function Component() {
       }
 
       // 선택된 프레임만 수집
-      const allFrames = (penDocumentData.children || []).filter(n => n.type === 'frame');
+      const allFrames = (penDocumentData.children || []).filter(function(n) { return n.type === 'frame'; });
       const checkboxes = document.querySelectorAll('#penFrameList input[type="checkbox"]');
       const selectedFrames = [];
-      checkboxes.forEach(cb => {
+      checkboxes.forEach(function(cb) {
         if (cb.checked) {
           const idx = parseInt(cb.dataset.idx);
           if (allFrames[idx]) selectedFrames.push(allFrames[idx]);
@@ -2607,9 +2689,19 @@ export default function Component() {
         return;
       }
 
+      // 진행 바 초기화
+      const progressEl = document.getElementById('penProgress');
+      const barEl = document.getElementById('penProgressBar');
+      const labelEl = document.getElementById('penProgressLabel');
+      const nameEl = document.getElementById('penProgressName');
+      if (progressEl) progressEl.style.display = 'block';
+      if (barEl) barEl.style.width = '0%';
+      if (labelEl) labelEl.textContent = '변환 시작 중...';
+      if (nameEl) nameEl.textContent = '';
+
       const btn = document.getElementById('convertPenBtn');
       if (btn) btn.classList.add('loading');
-      showPenStatus(`${selectedFrames.length}개 프레임 변환 중...`, 'info');
+      document.getElementById('penConvertStatus').className = 'status';
 
       parent.postMessage({
         pluginMessage: {
