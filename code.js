@@ -177,7 +177,7 @@ figma.ui.onmessage = async (msg) => {
 
   // .pen 프레임 변환
   if (msg.type === 'convert-pen-frames') {
-    await convertPenFrames(msg.frames);
+    await convertPenFrames(msg.frames, msg.variables);
   }
 };
 
@@ -2486,34 +2486,56 @@ async function createTextStylesFromTokens(tokens) {
 }
 
 // ===== .pen 프레임 → Figma 프레임 변환 =====
-async function convertPenFrames(penFrames) {
+
+// .pen 변수 테이블 ($--xxx → hex 색상)
+var penVariables = {};
+
+// $--변수명을 실제 색상으로 해석
+function resolvePenColor(value) {
+  if (!value) return null;
+  if (typeof value !== 'string') return null;
+  // 변수 참조인 경우
+  if (value.charAt(0) === '$') {
+    var key = value.slice(1); // '$--bg-default' → '--bg-default'
+    var v = penVariables[key];
+    if (v && v.value) return v.value;
+    return null; // 변수를 못 찾으면 null
+  }
+  return value; // 일반 hex 그대로 반환
+}
+
+async function convertPenFrames(penFrames, variables) {
   try {
+    // 변수 테이블 저장
+    penVariables = variables || {};
+
     let createdCount = 0;
     const errors = [];
 
-    for (const penFrame of penFrames) {
+    for (var fi = 0; fi < penFrames.length; fi++) {
+      var penFrame = penFrames[fi];
       try {
-        const figmaFrame = await convertPenNode(penFrame);
+        var figmaFrame = await convertPenNode(penFrame);
         if (figmaFrame) {
+          figmaFrame.x = penFrame.x || 0;
+          figmaFrame.y = penFrame.y || 0;
           figma.currentPage.appendChild(figmaFrame);
           createdCount++;
         }
       } catch (e) {
-        errors.push(`${penFrame.name || '프레임'}: ${e.message}`);
+        errors.push((penFrame.name || '프레임') + ': ' + e.message);
         console.error('프레임 변환 에러:', e);
       }
     }
 
-    let message = `✅ ${createdCount}개 프레임 변환 완료!`;
-    if (errors.length > 0) message += `\n⚠️ ${errors.length}개 에러`;
+    var message = '✅ ' + createdCount + '개 프레임 변환 완료!';
+    if (errors.length > 0) message += '\n⚠️ ' + errors.length + '개 에러';
 
     figma.ui.postMessage({
       type: 'pen-convert-status',
       status: errors.length > 0 ? 'warning' : 'success',
-      message
+      message: message
     });
-
-    figma.viewport.scrollAndZoomIntoView(figma.currentPage.selection);
 
   } catch (e) {
     console.error('.pen 변환 에러:', e);
@@ -2525,30 +2547,65 @@ async function convertPenFrames(penFrames) {
   }
 }
 
+// justifyContent/alignItems → Figma PRIMARY/COUNTER 정렬
+function mapJustify(val) {
+  var map = {
+    start: 'MIN', flex_start: 'MIN', 'flex-start': 'MIN',
+    center: 'CENTER',
+    end: 'MAX', flex_end: 'MAX', 'flex-end': 'MAX',
+    space_between: 'SPACE_BETWEEN', 'space-between': 'SPACE_BETWEEN'
+  };
+  return map[val] || 'MIN';
+}
+
+function mapAlignItems(val) {
+  var map = {
+    start: 'MIN', flex_start: 'MIN', 'flex-start': 'MIN',
+    center: 'CENTER',
+    end: 'MAX', flex_end: 'MAX', 'flex-end': 'MAX',
+    baseline: 'BASELINE'
+  };
+  return map[val] || 'MIN';
+}
+
 // .pen 노드 → Figma 노드 재귀 변환
 async function convertPenNode(penNode) {
   if (!penNode || !penNode.type) return null;
 
-  const type = penNode.type;
+  var type = penNode.type;
+
+  // icon_font는 작은 사각형 placeholder로
+  if (type === 'icon_font') {
+    var icon = figma.createRectangle();
+    icon.name = penNode.name || 'Icon';
+    icon.resize(penNode.width || 24, penNode.height || 24);
+    var iconColor = resolvePenColor(penNode.fill);
+    var iconRgb = iconColor ? hexToFigmaRgb(iconColor) : null;
+    if (iconRgb) {
+      icon.fills = [{ type: 'SOLID', color: { r: iconRgb.r, g: iconRgb.g, b: iconRgb.b }, opacity: iconRgb.a }];
+    } else {
+      icon.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
+    }
+    icon.cornerRadius = 2;
+    return icon;
+  }
 
   if (type === 'frame' || type === 'group') {
-    const frame = figma.createFrame();
+    var frame = figma.createFrame();
     frame.name = penNode.name || 'Frame';
 
-    // 크기
-    frame.resize(penNode.width || 100, penNode.height || 100);
-
-    // 위치
-    frame.x = penNode.x || 0;
-    frame.y = penNode.y || 0;
+    // 크기 (fill_container/hug_content는 일단 기본값, 나중에 부모가 sizing 설정)
+    var w = (typeof penNode.width === 'number') ? penNode.width : 100;
+    var h = (typeof penNode.height === 'number') ? penNode.height : 100;
+    frame.resize(w, h);
 
     // 모서리 반경
     if (penNode.cornerRadius != null) {
       if (Array.isArray(penNode.cornerRadius)) {
-        frame.topLeftRadius = penNode.cornerRadius[0] || 0;
-        frame.topRightRadius = penNode.cornerRadius[1] || 0;
+        frame.topLeftRadius    = penNode.cornerRadius[0] || 0;
+        frame.topRightRadius   = penNode.cornerRadius[1] || 0;
         frame.bottomRightRadius = penNode.cornerRadius[2] || 0;
-        frame.bottomLeftRadius = penNode.cornerRadius[3] || 0;
+        frame.bottomLeftRadius  = penNode.cornerRadius[3] || 0;
       } else {
         frame.cornerRadius = penNode.cornerRadius;
       }
@@ -2560,42 +2617,54 @@ async function convertPenNode(penNode) {
     // 불투명도
     if (penNode.opacity != null) frame.opacity = penNode.opacity;
 
-    // Auto Layout (layout 속성이 있으면)
-    if (penNode.layout === 'horizontal' || penNode.layout === 'vertical') {
-      frame.layoutMode = penNode.layout === 'horizontal' ? 'HORIZONTAL' : 'VERTICAL';
+    // clip
+    frame.clipsContent = penNode.clip === true;
+
+    // Auto Layout 결정:
+    // layout 속성이 있거나, justifyContent/alignItems가 있으면 Auto Layout 적용
+    var hasLayout = penNode.layout === 'horizontal' || penNode.layout === 'vertical';
+    var hasAlign  = penNode.justifyContent || penNode.alignItems;
+
+    if (hasLayout || hasAlign) {
+      // layout 명시 없으면 horizontal 기본
+      if (penNode.layout === 'vertical') {
+        frame.layoutMode = 'VERTICAL';
+      } else {
+        frame.layoutMode = 'HORIZONTAL';
+      }
 
       // 패딩
       if (penNode.padding != null) {
-        const p = penNode.padding;
+        var p = penNode.padding;
         if (Array.isArray(p)) {
-          frame.paddingTop    = p[0] || 0;
-          frame.paddingRight  = p[1] || 0;
-          frame.paddingBottom = p[2] || 0;
-          frame.paddingLeft   = p[3] || 0;
+          // [vertical, horizontal] 또는 [top, right, bottom, left]
+          if (p.length === 2) {
+            frame.paddingTop    = p[0];
+            frame.paddingBottom = p[0];
+            frame.paddingLeft   = p[1];
+            frame.paddingRight  = p[1];
+          } else if (p.length === 4) {
+            frame.paddingTop    = p[0];
+            frame.paddingRight  = p[1];
+            frame.paddingBottom = p[2];
+            frame.paddingLeft   = p[3];
+          }
         } else {
           frame.paddingTop = frame.paddingRight = frame.paddingBottom = frame.paddingLeft = p;
         }
       }
 
       // 간격
-      if (penNode.gap != null) {
-        frame.itemSpacing = penNode.gap;
-      }
+      if (penNode.gap != null) frame.itemSpacing = penNode.gap;
 
-      // 정렬
-      const hAlign = penNode.horizontalAlign || 'start';
-      const vAlign = penNode.verticalAlign || 'start';
-      if (frame.layoutMode === 'HORIZONTAL') {
-        frame.primaryAxisAlignItems   = mapAlign(hAlign);
-        frame.counterAxisAlignItems   = mapAlign(vAlign);
-      } else {
-        frame.primaryAxisAlignItems   = mapAlign(vAlign);
-        frame.counterAxisAlignItems   = mapAlign(hAlign);
-      }
+      // 정렬 (justifyContent = 주축, alignItems = 교차축)
+      var jc = penNode.justifyContent || 'start';
+      var ai = penNode.alignItems || 'start';
 
-      frame.clipsContent = penNode.clipContent !== false;
+      frame.primaryAxisAlignItems = mapJustify(jc);
+      frame.counterAxisAlignItems = mapAlignItems(ai);
+
     } else {
-      // 일반 프레임 (no auto layout)
       frame.layoutMode = 'NONE';
     }
 
@@ -2604,19 +2673,19 @@ async function convertPenNode(penNode) {
 
     // 자식 노드 재귀 생성
     if (Array.isArray(penNode.children)) {
-      for (const child of penNode.children) {
+      for (var ci = 0; ci < penNode.children.length; ci++) {
+        var child = penNode.children[ci];
         try {
-          const childNode = await convertPenNode(child);
+          var childNode = await convertPenNode(child);
           if (childNode) {
             frame.appendChild(childNode);
-
-            // Auto Layout 자식의 sizing
+            // Auto Layout 자식 sizing
             if (frame.layoutMode !== 'NONE') {
-              applyPenSizing(childNode, child, frame.layoutMode);
+              applyPenSizing(childNode, child);
             }
           }
-        } catch (e) {
-          console.warn('자식 노드 변환 실패:', e);
+        } catch (childErr) {
+          console.warn('자식 노드 변환 실패:', childErr);
         }
       }
     }
@@ -2624,42 +2693,50 @@ async function convertPenNode(penNode) {
     return frame;
 
   } else if (type === 'text') {
-    const text = figma.createText();
+    var text = figma.createText();
     text.name = penNode.name || 'Text';
-    text.x = penNode.x || 0;
-    text.y = penNode.y || 0;
 
-    // 폰트 로드 후 텍스트 설정
-    const fontFamily = penNode.fontFamily || 'Inter';
-    const fontWeight = penNode.fontWeight || 'Regular';
-    const figmaStyle = penFontWeightToStyle(fontWeight);
+    // 폰트 로드
+    var fontFamily = penNode.fontFamily || 'Inter';
+    var fontWeight = penNode.fontWeight || 'Regular';
+    var figmaStyle = penFontWeightToStyle(fontWeight);
+    var loadedFamily = fontFamily;
+    var loadedStyle = figmaStyle;
 
     try {
       await figma.loadFontAsync({ family: fontFamily, style: figmaStyle });
-    } catch (e) {
-      // fallback
-      try { await figma.loadFontAsync({ family: 'Inter', style: 'Regular' }); } catch (_) {}
-      text.fontName = { family: 'Inter', style: 'Regular' };
+    } catch (fe) {
+      try {
+        await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+        loadedFamily = 'Inter';
+        loadedStyle = 'Regular';
+      } catch (fe2) {}
     }
 
-    text.fontName = { family: fontFamily, style: figmaStyle };
-    text.characters = penNode.content || '';
-
+    text.fontName = { family: loadedFamily, style: loadedStyle };
+    text.characters = String(penNode.content || '');
     if (penNode.fontSize) text.fontSize = penNode.fontSize;
 
-    // 텍스트 색상
-    if (penNode.textColor) {
-      const rgb = hexToFigmaRgb(penNode.textColor);
-      if (rgb) {
-        text.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: rgb.a }];
+    // 텍스트 색상 (fill 속성 사용)
+    var textColorStr = resolvePenColor(penNode.fill);
+    if (textColorStr) {
+      var textRgb = hexToFigmaRgb(textColorStr);
+      if (textRgb) {
+        text.fills = [{ type: 'SOLID', color: { r: textRgb.r, g: textRgb.g, b: textRgb.b }, opacity: textRgb.a }];
       }
     } else {
-      text.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+      text.fills = [{ type: 'SOLID', color: { r: 0.07, g: 0.06, b: 0.1 } }];
     }
 
-    // 줄 높이
+    // 줄 높이 (1.4 같은 배율 → PERCENT, 픽셀 정수 → PIXELS)
     if (penNode.lineHeight) {
-      text.lineHeight = { value: penNode.lineHeight, unit: 'PIXELS' };
+      var lh = penNode.lineHeight;
+      if (lh > 0 && lh < 5) {
+        // 배율값 (예: 1.4)
+        text.lineHeight = { value: lh * 100, unit: 'PERCENT' };
+      } else {
+        text.lineHeight = { value: lh, unit: 'PIXELS' };
+      }
     }
 
     // 자간
@@ -2669,23 +2746,24 @@ async function convertPenNode(penNode) {
 
     // 텍스트 정렬
     if (penNode.textAlign) {
-      const alignMap = { left: 'LEFT', center: 'CENTER', right: 'RIGHT', justify: 'JUSTIFIED' };
-      text.textAlignHorizontal = alignMap[penNode.textAlign] || 'LEFT';
+      var taMap = { left: 'LEFT', center: 'CENTER', right: 'RIGHT', justify: 'JUSTIFIED' };
+      text.textAlignHorizontal = taMap[penNode.textAlign] || 'LEFT';
     }
 
-    if (penNode.width && penNode.height) {
+    // 고정 너비 텍스트
+    if (penNode.textGrowth === 'fixed-width' && typeof penNode.width === 'number') {
+      text.textAutoResize = 'HEIGHT';
+      text.resize(penNode.width, text.height || 20);
+    } else if (typeof penNode.width === 'number' && typeof penNode.height === 'number') {
       text.resize(penNode.width, penNode.height);
     }
 
     if (penNode.opacity != null) text.opacity = penNode.opacity;
-
     return text;
 
   } else if (type === 'rectangle') {
-    const rect = figma.createRectangle();
+    var rect = figma.createRectangle();
     rect.name = penNode.name || 'Rectangle';
-    rect.x = penNode.x || 0;
-    rect.y = penNode.y || 0;
     rect.resize(penNode.width || 100, penNode.height || 100);
 
     applyPenFill(rect, penNode.fill);
@@ -2706,11 +2784,9 @@ async function convertPenNode(penNode) {
     return rect;
 
   } else if (type === 'ellipse') {
-    const ellipse = figma.createEllipse();
+    var ellipse = figma.createEllipse();
     ellipse.name = penNode.name || 'Ellipse';
-    ellipse.x = penNode.x || 0;
-    ellipse.y = penNode.y || 0;
-    ellipse.resize(penNode.width || 100, penNode.height || 100);
+    ellipse.resize(penNode.width || 20, penNode.height || 20);
 
     applyPenFill(ellipse, penNode.fill);
     applyPenStroke(ellipse, penNode);
@@ -2719,16 +2795,12 @@ async function convertPenNode(penNode) {
     return ellipse;
 
   } else if (type === 'image') {
-    // 이미지는 사각형으로 대체 (이미지 URL 직접 접근 불가)
-    const rect = figma.createRectangle();
-    rect.name = penNode.name || 'Image';
-    rect.x = penNode.x || 0;
-    rect.y = penNode.y || 0;
-    rect.resize(penNode.width || 100, penNode.height || 100);
-    rect.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.9 } }];
-    if (penNode.opacity != null) rect.opacity = penNode.opacity;
-    return rect;
-
+    var imgRect = figma.createRectangle();
+    imgRect.name = penNode.name || 'Image';
+    imgRect.resize(penNode.width || 100, penNode.height || 100);
+    imgRect.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.9 } }];
+    if (penNode.opacity != null) imgRect.opacity = penNode.opacity;
+    return imgRect;
   }
 
   return null;
@@ -2741,77 +2813,89 @@ function applyPenFill(node, fill) {
     return;
   }
 
-  // fill이 색상 문자열인 경우
+  // 변수 참조 또는 hex 문자열
   if (typeof fill === 'string') {
-    const rgb = hexToFigmaRgb(fill);
-    if (rgb) {
-      node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: rgb.a }];
+    var resolvedColor = resolvePenColor(fill);
+    if (resolvedColor) {
+      var rgb = hexToFigmaRgb(resolvedColor);
+      if (rgb) {
+        node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: rgb.a }];
+      } else {
+        node.fills = [];
+      }
     } else {
       node.fills = [];
     }
     return;
   }
 
-  // fill이 객체인 경우 (type 포함)
-  if (fill.type === 'solid' || fill.type === 'SOLID') {
-    const rgb = hexToFigmaRgb(fill.color || fill.value || '#ffffff');
-    if (rgb) {
-      node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: fill.opacity != null ? fill.opacity : rgb.a }];
-    }
-  } else if (fill.type === 'linear' || fill.type === 'LINEAR_GRADIENT') {
-    // 선형 그라디언트 - 첫 번째 색상만 사용
-    const stops = fill.stops || [];
-    if (stops.length > 0) {
-      const rgb = hexToFigmaRgb(stops[0].color || '#ffffff');
-      if (rgb) node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b } }];
+  // fill이 객체 (type 포함)
+  if (fill && fill.type) {
+    if (fill.type === 'solid' || fill.type === 'SOLID') {
+      var c = resolvePenColor(fill.color || fill.value || '#ffffff');
+      var cRgb = c ? hexToFigmaRgb(c) : null;
+      if (cRgb) {
+        node.fills = [{ type: 'SOLID', color: { r: cRgb.r, g: cRgb.g, b: cRgb.b }, opacity: fill.opacity != null ? fill.opacity : cRgb.a }];
+      } else {
+        node.fills = [];
+      }
     } else {
       node.fills = [];
     }
-  } else if (fill === null || fill === 'none') {
-    node.fills = [];
   } else {
     node.fills = [];
   }
 }
 
-// .pen stroke 적용
+// .pen stroke 적용 (stroke: { align, thickness, fill } 형식)
 function applyPenStroke(node, penNode) {
-  if (!penNode.strokeColor && !penNode.stroke) return;
+  var stroke = penNode.stroke;
+  if (!stroke && !penNode.strokeColor) return;
 
-  const colorStr = penNode.strokeColor || (typeof penNode.stroke === 'string' ? penNode.stroke : null);
+  var colorStr = null;
+  var thickness = 1;
+
+  if (stroke && typeof stroke === 'object') {
+    // { align: 'inside', thickness: 1, fill: '#hex' 또는 '$--var' }
+    colorStr = resolvePenColor(stroke.fill);
+    thickness = stroke.thickness || 1;
+  } else if (typeof stroke === 'string') {
+    colorStr = resolvePenColor(stroke);
+  } else if (penNode.strokeColor) {
+    colorStr = resolvePenColor(penNode.strokeColor);
+    thickness = penNode.strokeThickness || 1;
+  }
+
   if (!colorStr) return;
-
-  const rgb = hexToFigmaRgb(colorStr);
+  var rgb = hexToFigmaRgb(colorStr);
   if (!rgb) return;
 
   node.strokes = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: rgb.a }];
-  node.strokeWeight = penNode.strokeThickness || penNode.strokeWeight || 1;
+  node.strokeWeight = thickness;
   node.strokeAlign = 'INSIDE';
 }
 
-// .pen 자식 sizing 적용 (Auto Layout 내부)
-function applyPenSizing(figmaNode, penNode, parentLayoutMode) {
-  if (!penNode.width && !penNode.height) return;
-
-  const isFillW = penNode.width === 'fill_container';
-  const isFillH = penNode.height === 'fill_container';
-  const isHugW  = penNode.width === 'hug_content';
-  const isHugH  = penNode.height === 'hug_content';
-
+// Auto Layout 자식 sizing
+function applyPenSizing(figmaNode, penNode) {
   try {
-    if (isFillW) figmaNode.layoutSizingHorizontal = 'FILL';
-    else if (isHugW) figmaNode.layoutSizingHorizontal = 'HUG';
-
-    if (isFillH) figmaNode.layoutSizingVertical = 'FILL';
-    else if (isHugH) figmaNode.layoutSizingVertical = 'HUG';
+    if (penNode.width === 'fill_container') {
+      figmaNode.layoutSizingHorizontal = 'FILL';
+    } else if (penNode.width === 'hug_content') {
+      figmaNode.layoutSizingHorizontal = 'HUG';
+    }
+    if (penNode.height === 'fill_container') {
+      figmaNode.layoutSizingVertical = 'FILL';
+    } else if (penNode.height === 'hug_content') {
+      figmaNode.layoutSizingVertical = 'HUG';
+    }
   } catch (e) {
     // sizing 설정 실패 무시
   }
 }
 
-// Primary/Counter axis 정렬 매핑
+// Primary/Counter axis 정렬 매핑 (기존 코드 호환용)
 function mapAlign(align) {
-  const map = {
+  var map = {
     start: 'MIN', center: 'CENTER', end: 'MAX',
     'space-between': 'SPACE_BETWEEN', baseline: 'BASELINE'
   };
@@ -2831,7 +2915,10 @@ function penFontWeightToStyle(weight) {
     if (weight <= 800) return 'ExtraBold';
     return 'Black';
   }
-  const map = {
+  // 문자열 weight ('700' 같은 숫자 문자열 포함)
+  var numW = parseInt(weight);
+  if (!isNaN(numW)) return penFontWeightToStyle(numW);
+  var map = {
     thin: 'Thin', extralight: 'ExtraLight', light: 'Light',
     regular: 'Regular', normal: 'Regular', medium: 'Medium',
     semibold: 'SemiBold', 'semi bold': 'Semi Bold', bold: 'Bold',

@@ -2614,7 +2614,8 @@ export default function Component() {
       parent.postMessage({
         pluginMessage: {
           type: 'convert-pen-frames',
-          frames: selectedFrames
+          frames: selectedFrames,
+          variables: penDocumentData.variables || {}
         }
       }, '*');
     }
