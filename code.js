@@ -2756,7 +2756,7 @@ function applyPenFill(node, fill) {
   if (fill.type === 'solid' || fill.type === 'SOLID') {
     const rgb = hexToFigmaRgb(fill.color || fill.value || '#ffffff');
     if (rgb) {
-      node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: fill.opacity ?? rgb.a }];
+      node.fills = [{ type: 'SOLID', color: { r: rgb.r, g: rgb.g, b: rgb.b }, opacity: fill.opacity != null ? fill.opacity : rgb.a }];
     }
   } else if (fill.type === 'linear' || fill.type === 'LINEAR_GRADIENT') {
     // 선형 그라디언트 - 첫 번째 색상만 사용

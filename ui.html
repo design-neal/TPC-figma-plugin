@@ -1921,7 +1921,7 @@ export default function Component() {
             body: `q=${encodeURIComponent(text)}`
           });
           const data = await response.json();
-          if (data.message?.result?.errata_count > 0) {
+          if (data.message && data.message.result && data.message.result.errata_count > 0) {
             const result = data.message.result;
             if (result.html !== result.notag_html) {
               errors.push({ original: text, correct: result.notag_html, help: `${result.errata_count}개 오류 발견` });
@@ -2919,7 +2919,7 @@ export default function Component() {
 
     // 미적용 레이어 모두 선택 버튼
     document.getElementById('selectAllErrorsBtn').onclick = () => {
-      const errorItems = checkerResults[currentCheckerType]?.filter(r => !r.isApplied) || [];
+      const errorItems = (checkerResults[currentCheckerType] || []).filter(r => !r.isApplied);
       if (errorItems.length === 0) {
         showCheckerStatus('미적용 레이어가 없습니다', 'info');
         return;
