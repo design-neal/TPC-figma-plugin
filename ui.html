@@ -895,6 +895,31 @@
       flex-shrink: 0;
     }
 
+    /* .pen 입력 탭 */
+    .pen-input-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .pen-input-tab {
+      flex: 1;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #D7D8E5;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5A5A73;
+      cursor: pointer;
+    }
+
+    .pen-input-tab.active {
+      background: #110F1A;
+      border-color: #110F1A;
+      color: #fff;
+    }
+
     /* .pen 사용 방법 안내 */
     .pen-howto {
       display: flex;
@@ -1569,33 +1594,43 @@ export default function Component() {
 
       <div class="status" id="code2designStatus"></div>
 
-      <!-- .pen 클립보드 붙여넣기 카드 -->
+      <!-- .pen 변환 카드 -->
       <div class="card" style="margin-top: 12px;">
         <h2 class="card-title">.pen → Figma Frame</h2>
 
-        <!-- 사용 방법 안내 -->
-        <div class="pen-howto">
-          <div class="pen-howto-step">
-            <span class="pen-howto-num">1</span>
-            <span>.pen 앱에서 프레임 선택</span>
+        <!-- 탭: 파일경로 / JSON 직접입력 -->
+        <div class="pen-input-tabs">
+          <button class="pen-input-tab active" id="penTabPath" onclick="switchPenTab('path')">📁 파일 경로</button>
+          <button class="pen-input-tab" id="penTabJson" onclick="switchPenTab('json')">📋 JSON 붙여넣기</button>
+        </div>
+
+        <!-- 파일 경로 입력 -->
+        <div id="penPathSection">
+          <div style="font-size:12px;color:#838499;margin-bottom:8px;">
+            .pen 파일 경로를 입력하고 불러오기를 누르세요
           </div>
-          <div class="pen-howto-step">
-            <span class="pen-howto-num">2</span>
-            <span><kbd>⌘C</kbd> 로 복사</span>
-          </div>
-          <div class="pen-howto-step">
-            <span class="pen-howto-num">3</span>
-            <span>아래 버튼 클릭 후 <kbd>⌘V</kbd></span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="penPathInput" class="input-text"
+              placeholder="/Users/yourname/Desktop/디자인.pen"
+              value="/Users/tpc/Desktop/디자인.pen"
+              style="flex:1;font-size:12px;">
+            <button class="btn btn-primary" id="penLoadBtn" onclick="loadPenFromPath()" style="white-space:nowrap;min-width:auto;padding:10px 14px;">
+              <span class="btn-text">불러오기</span>
+              <span class="btn-loading"><span class="btn-spinner"></span></span>
+            </button>
           </div>
         </div>
 
-        <!-- 붙여넣기 존 -->
-        <textarea
-          id="penPasteArea"
-          class="pen-paste-area"
-          placeholder="여기를 클릭하고 ⌘V 로 .pen 프레임을 붙여넣으세요"
-          readonly
-        ></textarea>
+        <!-- JSON 직접 붙여넣기 -->
+        <div id="penJsonSection" style="display:none;">
+          <div style="font-size:12px;color:#838499;margin-bottom:8px;">
+            터미널에서 복사한 .pen JSON을 붙여넣으세요
+          </div>
+          <textarea id="penPasteArea" class="pen-paste-area" style="height:100px;"
+            placeholder='{"children":[...],"variables":{...}}'
+          ></textarea>
+          <button class="btn btn-secondary" onclick="parsePenJson()" style="margin-top:8px;width:100%;">JSON 파싱</button>
+        </div>
 
         <!-- 파싱된 프레임 정보 -->
         <div class="pen-file-info" id="penFileInfo">
@@ -1604,14 +1639,14 @@ export default function Component() {
             <div class="pen-file-name" id="penFileName">프레임 감지됨</div>
             <div class="pen-file-meta" id="penFileMeta">0개 프레임</div>
           </div>
-          <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px; min-width: auto;" onclick="clearPenFile()">✕</button>
+          <button class="btn btn-secondary" style="padding:6px 10px;font-size:11px;min-width:auto;" onclick="clearPenFile()">✕</button>
         </div>
 
         <!-- 프레임 목록 -->
         <div class="pen-frame-list" id="penFrameList"></div>
 
         <div class="button-group">
-          <button class="btn btn-primary" id="convertPenBtn" onclick="convertPenFrames()" style="display: none;">
+          <button class="btn btn-primary" id="convertPenBtn" onclick="convertPenFrames()" style="display:none;">
             <span class="btn-text">🔄 Figma 프레임으로 변환</span>
             <span class="btn-loading">
               <span class="btn-spinner"></span>
@@ -2651,84 +2686,87 @@ export default function Component() {
       }
     }
 
-    // ===== .pen 클립보드 붙여넣기 =====
+    // ===== .pen 변환 =====
     var penDocumentData = null;
-    var penParsedFrames = []; // 붙여넣은 프레임들
+    var penParsedFrames = [];
 
-    var penPasteArea = document.getElementById('penPasteArea');
+    function switchPenTab(tab) {
+      var isPath = tab === 'path';
+      document.getElementById('penTabPath').className = 'pen-input-tab' + (isPath ? ' active' : '');
+      document.getElementById('penTabJson').className = 'pen-input-tab' + (!isPath ? ' active' : '');
+      document.getElementById('penPathSection').style.display = isPath ? 'block' : 'none';
+      document.getElementById('penJsonSection').style.display = !isPath ? 'block' : 'none';
+    }
 
-    // 붙여넣기 이벤트
-    penPasteArea.addEventListener('paste', function(e) {
-      e.preventDefault();
-      var text = (e.clipboardData || window.clipboardData).getData('text');
-      if (!text) {
-        showPenStatus('클립보드에 텍스트가 없습니다', 'error');
-        return;
-      }
-      parsePenClipboard(text);
-    });
+    // 파일 경로로 .pen 읽기
+    function loadPenFromPath() {
+      var path = document.getElementById('penPathInput').value.trim();
+      if (!path) { showPenStatus('파일 경로를 입력하세요', 'error'); return; }
 
-    // 클릭 시 포커스 (붙여넣기 유도)
-    penPasteArea.addEventListener('click', function() {
-      penPasteArea.focus();
-      penPasteArea.placeholder = '⌘V 를 눌러 붙여넣기...';
-    });
-    penPasteArea.addEventListener('blur', function() {
-      if (!penDocumentData) {
-        penPasteArea.placeholder = '여기를 클릭하고 ⌘V 로 .pen 프레임을 붙여넣으세요';
-      }
-    });
+      var btn = document.getElementById('penLoadBtn');
+      btn.classList.add('loading');
+      showPenStatus('파일 읽는 중...', 'info');
 
-    function parsePenClipboard(text) {
+      // file:// URL로 fetch 시도
+      var fileUrl = 'file://' + path;
+      fetch(fileUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('파일을 읽을 수 없습니다 (status ' + res.status + ')');
+          return res.text();
+        })
+        .then(function(text) {
+          btn.classList.remove('loading');
+          parsePenText(text);
+        })
+        .catch(function(err) {
+          btn.classList.remove('loading');
+          // fetch 실패 시 JSON 탭으로 안내
+          showPenStatus('파일 직접 읽기 실패. 아래 "JSON 붙여넣기" 탭을 이용하세요', 'error');
+          switchPenTab('json');
+          document.getElementById('penJsonSection').querySelector('div').innerHTML =
+            '터미널에서 아래 명령어를 실행하고 결과를 붙여넣으세요:<br>' +
+            '<code style="font-size:11px;background:#f0f0f0;padding:4px 8px;border-radius:6px;display:block;margin-top:6px;word-break:break-all;">' +
+            'cat "' + path + '" | pbcopy' +
+            '</code>';
+        });
+    }
+
+    // JSON textarea에서 직접 파싱
+    function parsePenJson() {
+      var text = document.getElementById('penPasteArea').value.trim();
+      if (!text) { showPenStatus('JSON을 먼저 붙여넣으세요', 'error'); return; }
+      parsePenText(text);
+    }
+
+    // 공통 파싱
+    function parsePenText(text) {
       text = text.trim();
       var doc = null;
-
-      // 1) .pen 전체 문서 JSON 시도
       try {
         var parsed = JSON.parse(text);
-        // 전체 문서 형식 { version, children, variables }
         if (parsed.children && Array.isArray(parsed.children)) {
           doc = parsed;
-        }
-        // 단일 프레임/노드 형식 { type: 'frame', ... }
-        else if (parsed.type === 'frame' || parsed.type === 'group') {
+        } else if (parsed.type === 'frame' || parsed.type === 'group') {
           doc = { children: [parsed], variables: {} };
-        }
-        // 프레임 배열 형식 [{ type: 'frame', ... }, ...]
-        else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].type) {
+        } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].type) {
           doc = { children: parsed, variables: {} };
         }
       } catch(e) {
-        // JSON 파싱 실패 → 그냥 에러
-        showPenStatus('JSON 파싱 실패: 올바른 .pen 프레임을 복사했는지 확인하세요', 'error');
+        showPenStatus('JSON 파싱 실패: ' + e.message, 'error');
         return;
       }
-
-      if (!doc) {
-        showPenStatus('.pen 프레임 데이터를 찾을 수 없습니다', 'error');
-        return;
-      }
+      if (!doc) { showPenStatus('.pen 프레임 데이터를 찾을 수 없습니다', 'error'); return; }
 
       penDocumentData = doc;
       var frames = doc.children.filter(function(n) { return n.type === 'frame'; });
-      // frame 없으면 children 전체를 단일 변환 대상으로
-      if (frames.length === 0 && doc.children.length > 0) {
-        frames = doc.children;
-      }
+      if (frames.length === 0 && doc.children.length > 0) frames = doc.children;
       penParsedFrames = frames;
-
-      // 붙여넣기 성공 표시
-      penPasteArea.classList.add('has-data');
-      penPasteArea.value = '✅ ' + frames.length + '개 프레임 감지됨 (다시 붙여넣으면 교체)';
-      penPasteArea.blur();
-
       displayPenFrames(frames, doc.variables || {});
     }
 
     function displayPenFrames(frames, variables) {
-      var varCount = Object.keys(variables).length;
       document.getElementById('penFileName').textContent = frames.length + '개 프레임 감지됨';
-      document.getElementById('penFileMeta').textContent = varCount + '개 컬러 변수 포함';
+      document.getElementById('penFileMeta').textContent = Object.keys(variables).length + '개 컬러 변수 포함';
       document.getElementById('penFileInfo').classList.add('show');
       document.getElementById('penConvertStatus').className = 'status';
 
@@ -2749,6 +2787,7 @@ export default function Component() {
       if (frames.length > 0) {
         listEl.classList.add('show');
         document.getElementById('convertPenBtn').style.display = 'flex';
+        showPenStatus(frames.length + '개 프레임 로드 완료!', 'success');
       } else {
         showPenStatus('변환 가능한 프레임이 없습니다', 'error');
       }
@@ -2757,9 +2796,8 @@ export default function Component() {
     function clearPenFile() {
       penDocumentData = null;
       penParsedFrames = [];
-      penPasteArea.value = '';
-      penPasteArea.classList.remove('has-data');
-      penPasteArea.placeholder = '여기를 클릭하고 ⌘V 로 .pen 프레임을 붙여넣으세요';
+      var pa = document.getElementById('penPasteArea');
+      if (pa) pa.value = '';
       document.getElementById('penFileInfo').classList.remove('show');
       document.getElementById('penFrameList').classList.remove('show');
       document.getElementById('convertPenBtn').style.display = 'none';
@@ -2769,10 +2807,7 @@ export default function Component() {
 
     function showPenStatus(message, type) {
       var el = document.getElementById('penConvertStatus');
-      if (el) {
-        el.textContent = message;
-        el.className = 'status show ' + type;
-      }
+      if (el) { el.textContent = message; el.className = 'status show ' + type; }
     }
 
     function convertPenFrames() {
